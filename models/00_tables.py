@@ -31,6 +31,7 @@ import eden.inv
 import eden.irs
 import eden.member
 import eden.msg
+import eden.cap
 import eden.ocr
 import eden.org
 import eden.patient

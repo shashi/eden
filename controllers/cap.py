@@ -21,10 +21,10 @@ def index():
 
 # =============================================================================
 def alert():
-    """ Compose a Message which can be sent to a pentity via a number of different communications channels """
+    """ CAP Alerts RESTful controller """
 
-    return s3_rest_controller()
+    tablename = "%s_%s" % (module, resourcename)
+    table = s3db[tablename]
 
-# =============================================================================
-def create():
-    return {}
+    output = s3_rest_controller()
+    return output
