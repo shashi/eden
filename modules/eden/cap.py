@@ -240,7 +240,7 @@ class S3CAPModel(S3Model):
         }
         table = self.define_table(tablename,
                                   Field("language"),
-                                  Field("category",
+                                  Field("category", "text",
                                         requires=IS_IN_SET(cap_info_category_opts,
                                             multiple=True)), # 0 or more allowed
                                   Field("event", required=True),
@@ -259,17 +259,17 @@ class S3CAPModel(S3Model):
                                         required=True,
                                         notnull=True,
                                         requires=IS_IN_SET(cap_info_certainty_opts)),
-                                  Field("audience"),
+                                  Field("audience", "text"),
                                   Field("event_code", "list:string"), # this is actually a map. Handled by the widget
                                   Field("effective", "datetime"),
                                   Field("onset", "datetime"),
                                   Field("expires", "datetime"),
                                   Field("sender_name"),
                                   Field("headline"),
-                                  Field("description"),
-                                  Field("instruction"),
+                                  Field("description", "text"),
+                                  Field("instruction", "text"),
+                                  Field("contact", "text"),
                                   Field("web", requires=IS_NULL_OR(IS_URL())),
-                                  Field("contact"),
                                   Field("parameter", "list:string"),
                                   Field("resource", "list:reference cap_info_resource"),
                                   Field("area", "list:reference cap_info_area"),
@@ -425,6 +425,7 @@ class S3CAPModel(S3Model):
               _title="%s|%s" % (
                   T("A system-specific additional parameter associated with the alert message"),
                   T("Any system-specific datum, in the form of key-value pairs.")))
+        table.parameter.widget = S3KeyValueWidget()
 
         table.area.comment = DIV(
               _class="tooltip",
@@ -437,11 +438,11 @@ class S3CAPModel(S3Model):
 
         # CAP alert Status Code (status)
         cap_alert_status_code_opts = {
-            "Actual":T("Actual: actionable by all targeted recipients"),
-            "Exercise":T("Exercise: only for designated participants (decribed in note)"),
-            "System":T("System: for internal functions"),
-            "Test":T("Test: testing, all recipients disregard"),
-            "Draft":T("Draft: not actionable in its current form"),
+            "Actual":T("Actual - actionable by all targeted recipients"),
+            "Exercise":T("Exercise - only for designated participants (decribed in note)"),
+            "System":T("System - for internal functions"),
+            "Test":T("Test - testing, all recipients disregard"),
+            "Draft":T("Draft - not actionable in its current form"),
         }
         # CAP alert message type (msgType)
         cap_alert_msgType_code_opts = {
@@ -465,7 +466,7 @@ class S3CAPModel(S3Model):
                                   Field("scope"),
                                   Field("restriction"), # text decribing the restriction for scope=restricted
                                   Field("addresses", "list:string"),
-                                  Field("codes"),
+                                  Field("codes", "list:string"),
                                   Field("note"),
                                   Field("info", "list:reference cap_info"),
                                   Field("reference", "list:reference cap_alert"),
@@ -528,7 +529,7 @@ class S3CAPModel(S3Model):
               _title="%s|%s" % (
                   T("Codes for special handling of the message"),
                   T("Any user-defined flags or special codes used to flag the alert message for special handling.")))
-        #table.codes.widget = S3CAPKeyValueWidget
+        table.codes.widget = S3KeyValueWidget()
 
         table.note.comment = DIV(
               _class="tooltip",
@@ -554,6 +555,25 @@ class S3CAPModel(S3Model):
         #table.info.widget = S3CAPMultipleInfoWidget
         table.info.widget = lambda k, v: SQLFORM(current.db.cap_info)
         table.info.label = T("Information")
+
+        ADD_ALERT = T("Create CAP Alert")
+        LIST_ALERTS = T("List alerts")
+        s3.crud_strings[tablename] = Storage(
+            title_create = ADD_ALERT,
+            title_display = T("CAP Alert"),
+            title_list = LIST_ALERTS,
+            title_update = T("Update CAP alert"), # this will create a new "Update" alert?
+            title_upload = T("Import CAP Alerts"),
+            title_search = T("Search CAP Alerts"),
+            subtitle_create = T("Create and Broadcast CAP Alert"),
+            subtitle_list = T("Listing of CAP Alerts created and received"),
+            label_list_button = LIST_ALERTS,
+            label_create_button = ADD_ALERT,
+            label_delete_button = T("Delete CAP Alert"),
+            msg_record_created = T("CAP alert created"),
+            msg_record_modified = T("CAP alert modified"),
+            msg_record_deleted = T("CAP alert deleted"),
+            msg_list_empty = T("No CAP alerts to show"))
 
         # ---------------------------------------------------------------------
         # Pass variables back to global scope (response.s3.*)

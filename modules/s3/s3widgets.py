@@ -54,6 +54,7 @@ __all__ = ["S3HiddenWidget",
            "S3SearchAutocompleteWidget",
            "S3TimeIntervalWidget",
            "S3EmbedComponentWidget",
+           "S3KeyValueWidget",
            "S3SliderWidget",
            "S3InvBinWidget",
            "s3_comments_widget",
@@ -3212,5 +3213,72 @@ class S3OptionsMatrixWidget(FormWidget):
             current.response.s3.jquery_ready.append("$('#{0}').s3optionsmatrix();".format(attributes.get('_id')))
 
         return TABLE(header, TBODY(grid_rows), **attributes)
+
+# =============================================================================
+class S3KeyValueWidget(ListWidget):
+    """
+        Allows for input of key-value pairs and stores them as list:string
+    """
+
+    def __init__(self):
+        """
+            Returns a widget with key-value fields
+        """
+        self._class = 'key-value-pairs'
+
+    def __call__(self, field, value, **attributes):
+        T = current.T
+        _id = '%s_%s' % (field._tablename, field.name)
+        _name = field.name
+        _class = 'string'
+        requires = field.requires if isinstance(field.requires, (IS_NOT_EMPTY, IS_LIST_OF)) else None
+        items = []
+        separator = '`'
+
+        for val in value or ['']:
+            kv = val.split(separator)
+            k = kv[0]
+            if len(kv)>1: v = kv[1]
+            else: v = ''
+
+            items.append(LI(
+                INPUT(_id=_id, _class=_class, _name=_name, _type="hidden", value=val, hideerror=True, requires=requires),
+                T("Key: "),
+                INPUT(_class="key",   _type="text", _value=k),
+                T(" Value: "),
+                INPUT(_class="value", _type="text", _value=v)
+            ))
+
+        script=SCRIPT("""
+$.fn.kv_pairs = function () {
+    var self=$(this),
+        plus=$('<a href="javascript:void(0)">+</a>').click(function(){ new_item() });
+
+    function new_item () {
+        self.find("li").each(function() {
+          var trimmed = $.trim($(this).find(":hidden").val());
+          if (trimmed=='' || trimmed == '%s') $(this).remove();
+        });
+
+        var ref = self.find(":hidden").eq(0).clone();
+        ref.val('');
+        self.append($("<li></li>").append(ref).append('%s <input class="key" type="text"> %s <input class="value" type="text">').append(plus)).find(".key:last").focus();
+        return false;
+    }
+
+    self.find(".value,.key").live('keypress', function (e) {
+        return (e.which == 13) ?
+            new_item() : true;
+    }).live('blur', function () {
+        var li = $(this).parents().eq(0)
+        li.find(":hidden").val(li.find(".key").val() + "%s" + li.find(".value").val())
+    })
+
+    self.find(".value:last").after(plus);
+}
+jQuery(document).ready(function(){jQuery('#%s_kv_pairs').kv_pairs();});
+""" % (separator, T("Key: "), T("Value: "), separator, _id))
+        attributes['_id']=_id+'_kv_pairs'
+        return TAG[''](UL(*items,**attributes),script)
 
 # END =========================================================================
