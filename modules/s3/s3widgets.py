@@ -3220,11 +3220,23 @@ class S3KeyValueWidget(ListWidget):
         Allows for input of key-value pairs and stores them as list:string
     """
 
-    def __init__(self):
+    def __init__(self, key_label=None, value_label=None, delimiter="`"):
         """
             Returns a widget with key-value fields
         """
         self._class = 'key-value-pairs'
+        self.delimiter = delimiter
+        T = current.T
+
+        if key_label == None:
+            self.key_label = T("Key: ")
+        else:
+            self.key_label = key_label
+
+        if value_label == None:
+            self.value_label = T("Value: ")
+        else:
+            self.value_label = value_label
 
     def __call__(self, field, value, **attributes):
         T = current.T
@@ -3233,36 +3245,35 @@ class S3KeyValueWidget(ListWidget):
         _class = 'string'
         requires = field.requires if isinstance(field.requires, (IS_NOT_EMPTY, IS_LIST_OF)) else None
         items = []
-        separator = '`'
 
         for val in value or ['']:
-            kv = val.split(separator)
+            kv = val.split(self.delimiter)
             k = kv[0]
             if len(kv)>1: v = kv[1]
             else: v = ''
 
             items.append(LI(
                 INPUT(_id=_id, _class=_class, _name=_name, _type="hidden", value=val, hideerror=True, requires=requires),
-                T("Key: "),
+                self.key_label,
                 INPUT(_class="key",   _type="text", _value=k),
-                T(" Value: "),
+                self.value_label,
                 INPUT(_class="value", _type="text", _value=v)
             ))
 
-        script=SCRIPT("""
-$.fn.kv_pairs = function () {
+        script = SCRIPT("""
+$.fn.kv_pairs = function (keyl, vall, delim) {
     var self=$(this),
         plus=$('<a href="javascript:void(0)">+</a>').click(function(){ new_item() });
 
     function new_item () {
         self.find("li").each(function() {
           var trimmed = $.trim($(this).find(":hidden").val());
-          if (trimmed=='' || trimmed == '%s') $(this).remove();
+          if (trimmed=='' || trimmed == delim) $(this).remove();
         });
 
         var ref = self.find(":hidden").eq(0).clone();
         ref.val('');
-        self.append($("<li></li>").append(ref).append('%s <input class="key" type="text"> %s <input class="value" type="text">').append(plus)).find(".key:last").focus();
+        self.append($("<li></li>").append(ref).append(keyl + ' <input class="key" type="text"> ' + vall + ' <input class="value" type="text">').append(plus)).find(".key:last").focus();
         return false;
     }
 
@@ -3271,14 +3282,15 @@ $.fn.kv_pairs = function () {
             new_item() : true;
     }).live('blur', function () {
         var li = $(this).parents().eq(0)
-        li.find(":hidden").val(li.find(".key").val() + "%s" + li.find(".value").val())
+        li.find(":hidden").val(li.find(".key").val() + delim + li.find(".value").val())
     })
 
     self.find(".value:last").after(plus);
 }
-jQuery(document).ready(function(){jQuery('#%s_kv_pairs').kv_pairs();});
-""" % (separator, T("Key: "), T("Value: "), separator, _id))
+jQuery(document).ready(function(){jQuery('#%s_kv_pairs').kv_pairs("%s", "%s", "%s");});
+""" % (_id, self.key_label, self.value_label, self.delimiter))
         attributes['_id']=_id+'_kv_pairs'
+
         return TAG[''](UL(*items,**attributes),script)
 
 # END =========================================================================
