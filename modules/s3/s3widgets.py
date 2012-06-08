@@ -3255,15 +3255,17 @@ class S3KeyValueWidget(ListWidget):
             items.append(LI(
                 INPUT(_id=_id, _class=_class, _name=_name, _type="hidden", value=val, hideerror=True, requires=requires),
                 self.key_label,
-                INPUT(_class="key",   _type="text", _value=k),
+                INPUT(_class="key",   _type="text", _value=k), " ",
                 self.value_label,
                 INPUT(_class="value", _type="text", _value=v)
             ))
 
         script = SCRIPT("""
+(function($){
 $.fn.kv_pairs = function (keyl, vall, delim) {
     var self=$(this),
-        plus=$('<a href="javascript:void(0)">+</a>').click(function(){ new_item() });
+        ref = self.find(":hidden:first").clone(),
+        plus=$('<a href="javascript:void(0)">+</a>').click(function() {new_item();});
 
     function new_item () {
         self.find("li").each(function() {
@@ -3271,15 +3273,14 @@ $.fn.kv_pairs = function (keyl, vall, delim) {
           if (trimmed=='' || trimmed == delim) $(this).remove();
         });
 
-        var ref = self.find(":hidden").eq(0).clone();
-        ref.val('');
-        self.append($("<li></li>").append(ref).append(keyl + ' <input class="key" type="text"> ' + vall + ' <input class="value" type="text">').append(plus)).find(".key:last").focus();
+        self.append($("<li>").append(ref.clone().val(''))
+            .append(keyl + ' <input class="key" type="text"> ' + vall + ' <input class="value" type="text">')
+            .append(plus)).find(".key:last").focus();
         return false;
     }
 
     self.find(".value,.key").live('keypress', function (e) {
-        return (e.which == 13) ?
-            new_item() : true;
+        return (e.which == 13) ? $(this).is(".value") && new_item() : true;
     }).live('blur', function () {
         var li = $(this).parents().eq(0)
         li.find(":hidden").val(li.find(".key").val() + delim + li.find(".value").val())
@@ -3287,6 +3288,7 @@ $.fn.kv_pairs = function (keyl, vall, delim) {
 
     self.find(".value:last").after(plus);
 }
+})(jQuery);
 jQuery(document).ready(function(){jQuery('#%s_kv_pairs').kv_pairs("%s", "%s", "%s");});
 """ % (_id, self.key_label, self.value_label, self.delimiter))
         attributes['_id']=_id+'_kv_pairs'

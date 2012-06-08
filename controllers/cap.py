@@ -27,4 +27,5 @@ def alert():
     table = s3db[tablename]
 
     output = s3_rest_controller()
+    pass
     return output
