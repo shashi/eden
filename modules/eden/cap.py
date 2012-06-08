@@ -452,6 +452,12 @@ class S3CAPModel(S3Model):
             "Ack":T("Ack: Acknowledge receipt and acceptance of the message(s)"),
             "Error":T("Error: Indicate rejection of the message(s)"),
         }
+        # CAP alert scope
+        cap_alert_scope_code_opts = {
+            "Public": "Public - unrestricted audiences",
+            "Restricted": "Restricted - to users with a known operational requirement (described in restriction)",
+            "Private": "Private - only to specified addresses (mentioned in addresses)"
+        }
 
         table = self.define_table(tablename,
                                   # identifier string, as was recieved.
@@ -463,7 +469,8 @@ class S3CAPModel(S3Model):
                                   Field("msg_type",
                                         requires=IS_IN_SET(cap_alert_msgType_code_opts)),
                                   Field("source"),
-                                  Field("scope"),
+                                  Field("scope",
+                                        requires=IS_IN_SET(cap_alert_scope_code_opts)),
                                   Field("restriction"), # text decribing the restriction for scope=restricted
                                   Field("addresses", "list:string"),
                                   Field("codes", "list:string"),
@@ -488,14 +495,14 @@ class S3CAPModel(S3Model):
               _class="tooltip",
               _title="%s|%s" % (
                   T("Denotes the appropriate handling of the alert message"),
-                  T("")))
+                  T("See options.")))
 
         table.msg_type.label = T("Message Type")
         table.msg_type.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
                   T("The nature of the alert message"),
-                  T("A number or string uniquely identifying this message, assigned by the sender. Must notnclude spaces, commas or restricted characters (< and &).")))
+                  T("See options.")))
 
         table.source.comment = DIV(
               _class="tooltip",
@@ -535,7 +542,7 @@ class S3CAPModel(S3Model):
               _class="tooltip",
               _title="%s|%s" % (
                   T("The text describing the purpose or significance of the alert message"),
-                  T("The message note is primarily intended for use with <status> “Exercise” and <msgType> “Error”")))
+                  T("The message note is primarily intended for use with status 'Exercise' and message type 'Error'")))
 
         # FIXME: this should not be manually entered, needs a widget
         table.reference.comment = DIV(
