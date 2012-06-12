@@ -55,6 +55,7 @@ __all__ = ["S3HiddenWidget",
            "S3TimeIntervalWidget",
            "S3EmbedComponentWidget",
            "S3KeyValueWidget",
+           "S3MultiCAPInfoWidget",
            "S3SliderWidget",
            "S3InvBinWidget",
            "s3_comments_widget",
@@ -3294,5 +3295,36 @@ jQuery(document).ready(function(){jQuery('#%s_kv_pairs').kv_pairs("%s", "%s", "%
         attributes['_id']=_id+'_kv_pairs'
 
         return TAG[''](UL(*items,**attributes),script)
+
+# =============================================================================
+class S3MultiCAPInfoWidget(FormWidget):
+    """
+        Renders a list:references field that references to cap_info
+    """
+
+    def __init__(self):
+        pass
+    def __call__(self, field, value):
+        T = current.T
+        db = current.db
+        _id = '%s_%s' % (field._tablename, field.name)
+        _name = field.name
+
+        original = [INPUT(_type="hidden", _id=_id, _name=_name, _value=v) \
+                        for v in value or ['']]
+        heading = DIV(B(T("Information")), _class="box_top expand", _id="cap_info_expand")
+        form = SQLFORM(db.cap_info)
+        # Components to inject into Form
+        divider = TR(TD(_class="subheading"),
+                     _class="box_bottom locselect")
+        expand_button = DIV(_id="gis_location_expand", _class="expand")
+        label_row = TR(TD(expand_button, B("%s:" % field.label)),
+                       _id="gis_location_label_row",
+                       _class="box_top")
+
+        return TAG[""](TR(*original),
+                       heading,
+                       form)
+        pass
 
 # END =========================================================================

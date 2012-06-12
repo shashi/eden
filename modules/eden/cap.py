@@ -128,9 +128,6 @@ class S3CAPModel(S3Model):
                   T("Calculated using the Secure Hash Algorithm (SHA-1).")))
 
 
-
-
-
         # ---------------------------------------------------------------------
         tablename = "cap_info_area"
         # FIXME: Use gis_location here and convert wkt to WGS84
@@ -238,6 +235,7 @@ class S3CAPModel(S3Model):
             "Unlikely":T("Not expected to occur (p ~ 0)"),
             "Unknown":T("Certainty unknown"),
         }
+
         table = self.define_table(tablename,
                                   Field("language"),
                                   Field("category", "text",
@@ -561,9 +559,8 @@ class S3CAPModel(S3Model):
                   T("Used to collate multiple messages referring to different aspects of the same incident. If multie incident identifiers are referenced, they SHALL be separated by whitespace.  Incident names including whitespace SHALL be surrounded by double-quotes.")))
         #table.addresses.widget = S3MultiSelect with the EDXL categories.
 
-        #table.info.widget = S3CAPMultipleInfoWidget
         table.info.widget = lambda k, v: SQLFORM(current.db.cap_info)
-        table.info.label = T("Information")
+        table.info.widget = S3MultiCAPInfoWidget()
 
         ADD_ALERT = T("Create CAP Alert")
         LIST_ALERTS = T("List alerts")
