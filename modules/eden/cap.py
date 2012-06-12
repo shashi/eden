@@ -349,6 +349,7 @@ class S3CAPModel(S3Model):
               _title="%s|%s" % (
                   T("A system-specific code identifying the event type of the alert message"),
                   T("Any system-specific code for events, in the form of key-value pairs. (e.g., SAME, FIPS, ZIP).")))
+        table.event_code.widget = S3KeyValueWidget()
 
 
         table.effective.comment = DIV(
@@ -471,10 +472,10 @@ class S3CAPModel(S3Model):
                                   Field("source"),
                                   Field("scope",
                                         requires=IS_IN_SET(cap_alert_scope_code_opts)),
-                                  Field("restriction"), # text decribing the restriction for scope=restricted
+                                  Field("restriction", "text"), # text decribing the restriction for scope=restricted
                                   Field("addresses", "list:string"),
                                   Field("codes", "list:string"),
-                                  Field("note"),
+                                  Field("note", "text"),
                                   Field("info", "list:reference cap_info"),
                                   Field("reference", "list:reference cap_alert"),
                                   Field("incidents"),
@@ -529,6 +530,7 @@ class S3CAPModel(S3Model):
               _title="%s|%s" % (
                   T("The group listing of intended recipients of the alert message"),
                   T("Required when scope is 'Private', optional when scope is 'Public' or 'Restricted'. Each recipient shall be identified by an identifier or an address.")))
+        table.addresses.label = T("Recipients")
         #table.addresses.widget = S3CAPAddressesWidget
 
         table.codes.comment = DIV(
@@ -557,7 +559,7 @@ class S3CAPModel(S3Model):
               _title="%s|%s" % (
                   T("A list of incident(s) referenced by the alert message"),
                   T("Used to collate multiple messages referring to different aspects of the same incident. If multie incident identifiers are referenced, they SHALL be separated by whitespace.  Incident names including whitespace SHALL be surrounded by double-quotes.")))
-        #table.addresses.widget = S3CAPIncidentsWidget
+        #table.addresses.widget = S3MultiSelect with the EDXL categories.
 
         #table.info.widget = S3CAPMultipleInfoWidget
         table.info.widget = lambda k, v: SQLFORM(current.db.cap_info)
