@@ -138,7 +138,6 @@ class S3CAPModel(S3Model):
                                   Field("geocode", "list:string"),
                                   Field("altitude", "integer"),
                                   Field("ceiling", "integer"),
-                                  location_id(),
                                   *s3.meta_fields())
 
         table.area_desc.comment = DIV(
@@ -167,6 +166,7 @@ class S3CAPModel(S3Model):
               _title="%s|%s" % (
                   T("The geographic code delineating the affected area"),
                   T("Any geographically-based code to describe a message target area, in the form. The key is a user-assigned string designating the domain of the code, and the content of value is a string (which may represent a number) denoting the value itself (e.g., name='ZIP' and value='54321'). This should be used in concert with an equivalent description in the more universally understood polygon and circle forms whenever possible.")))
+        table.geocode.widget = S3KeyValueWidget()
 
         table.altitude.comment = DIV(
               _class="tooltip",
@@ -355,12 +355,14 @@ class S3CAPModel(S3Model):
               _title="%s|%s" % (
                   T("The effective time of the information of the alert message"),
                   T("If not specified, the effective time shall be assumed to be the same the time the alert was sent.")))
+        table.effective.widget = S3DateTimeWidget()
 
         table.onset.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
                   T("The expected time of the beginning of the subject event of the alert message"),
                   T("")))
+        table.onset.widget = S3DateTimeWidget()
 
 
         table.expires.comment = DIV(
@@ -368,6 +370,7 @@ class S3CAPModel(S3Model):
               _title="%s|%s" % (
                   T("The expiry time of the information of the alert message"),
                   T("If this item is not provided, each recipient is free to enforce its own policy as to when the message is no longer in effect.")))
+        table.expires.widget = S3DateTimeWidget(past=0)
 
 
         table.sender_name.comment = DIV(
@@ -416,6 +419,9 @@ class S3CAPModel(S3Model):
               _title="%s|%s" % (
                   T("Additional files supplimenting the alert message."),
                   T("")))
+        table.resource.widget = S3ReferenceWidget(current.db.cap_info_resource,
+                                                  one_to_many=True,
+                                                  use_iframe=True)
 
 
         table.parameter.label = T("Parameters")
@@ -431,6 +437,7 @@ class S3CAPModel(S3Model):
               _title="%s|%s" % (
                   T("The affected area of the alert"),
                   T("")))
+        table.area.widget = S3ReferenceWidget(current.db.cap_info_area, one_to_many=True)
 
         # ---------------------------------------------------------------------
         tablename = "cap_alert"
@@ -549,8 +556,8 @@ class S3CAPModel(S3Model):
               _class="tooltip",
               _title="%s|%s" % (
                   T("The group listing identifying earlier message(s) referenced by the alert message"),
-                  T("The extended message identifier(s) (in the form sender,identifier,sent) of an earlier CAP message or messages referenced by this one. If multiple messages are referenced, they shall be separated by whitespace.")))
-        #table.references.widget = S3CAPAlertReferencesWidget
+                  T("The extended message identifier(s) (in the form sender,identifier,sent) of an earlier CAP message or messages referenced by this one.")))
+        table.reference.widget = S3ReferenceWidget(table, one_to_many=True, allow_create=False)
 
         table.incidents.comment = DIV(
               _class="tooltip",
@@ -559,8 +566,8 @@ class S3CAPModel(S3Model):
                   T("Used to collate multiple messages referring to different aspects of the same incident. If multie incident identifiers are referenced, they SHALL be separated by whitespace.  Incident names including whitespace SHALL be surrounded by double-quotes.")))
         #table.addresses.widget = S3MultiSelect with the EDXL categories.
 
-        table.info.widget = lambda k, v: SQLFORM(current.db.cap_info)
-        table.info.widget = S3MultiCAPInfoWidget()
+        table.info.widget = S3ReferenceWidget(current.db.cap_info, one_to_many=True, search_existing=False)
+        table.info.label = T("Alert Information")
 
         ADD_ALERT = T("Create CAP Alert")
         LIST_ALERTS = T("List alerts")

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Messaging Module - Controllers
+    CAP Module - Controllers
 """
 
 module = request.controller
@@ -26,9 +26,8 @@ def alert():
     tablename = "%s_%s" % (module, resourcename)
     table = s3db[tablename]
 
-    # ad-hoc -- FIXME
-    response.s3.scripts.append("/%s/static/scripts/S3/s3.cap.js")
+    response.s3.scripts.append("/%s/static/scripts/S3/s3.cap.js" % request.application)
+    response.s3.stylesheets.append("S3/cap.css")
 
     output = s3_rest_controller()
-    pass
     return output
