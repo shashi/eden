@@ -3261,40 +3261,10 @@ class S3KeyValueWidget(ListWidget):
                 INPUT(_class="value", _type="text", _value=v)
             ))
 
-        script = SCRIPT("""
-(function($){
-$.fn.kv_pairs = function (keyl, vall, delim) {
-    var self=$(this),
-        ref = self.find(":hidden:first").clone(),
-        plus=$('<a href="javascript:void(0)">+</a>').click(function() {new_item();});
+        attributes["_id"]=_id+"_kv_pairs"
+        attributes["_class"] = "key_value_widget"
 
-    function new_item () {
-        self.find("li").each(function() {
-          var trimmed = $.trim($(this).find(":hidden").val());
-          if (trimmed=='' || trimmed == delim) $(this).remove();
-        });
-
-        self.append($("<li>").append(ref.clone().val(''))
-            .append(keyl + ' <input class="key" type="text"> ' + vall + ' <input class="value" type="text">')
-            .append(plus)).find(".key:last").focus();
-        return false;
-    }
-
-    self.find(".value,.key").live('keypress', function (e) {
-        return (e.which == 13) ? $(this).is(".value") && new_item() : true;
-    }).live('blur', function () {
-        var li = $(this).parents().eq(0)
-        li.find(":hidden").val(li.find(".key").val() + delim + li.find(".value").val())
-    })
-
-    self.find(".value:last").after(plus);
-}
-})(jQuery);
-jQuery(document).ready(function(){jQuery('#%s_kv_pairs').kv_pairs("%s", "%s", "%s");});
-""" % (_id, self.key_label, self.value_label, self.delimiter))
-        attributes['_id']=_id+'_kv_pairs'
-
-        return TAG[''](UL(*items,**attributes),script)
+        return TAG[''](UL(*items,**attributes))
 
 # =============================================================================
 class S3ReferenceWidget(FormWidget):
@@ -3337,9 +3307,9 @@ class S3ReferenceWidget(FormWidget):
         else:
             form = SQLFORM(self.table)
 
-        return DIV(form,
-                   _class="nested_form %s" % ["", "with_iframe"][use_iframe],
-                   _id="%s_nested_form" % _id)
+        return OL(LI(form, _class="nested_form"),
+                   _class="nested_forms %s" % ["", "with_iframe"][self.use_iframe],
+                   _id="%s_nested_forms" % _id)
 
     def __call__(self, field, value):
         """
@@ -3361,11 +3331,11 @@ class S3ReferenceWidget(FormWidget):
         # Components to inject into Form
         divider = TR(TD(_class="subheading"), TD(),
                      _class="box_bottom ref_select")
-        expand_button = DIV(_id="gis_location_expand", _class="expand")
+        expand_button = DIV(_id="%s_expand" % _id, _class="expand")
 
         label_row = TR(TD(expand_button, B("%s:" % field.label)),
                        TD(),
-                       _id="gis_location_label_row",
+                       _id="%s_label_row" % _id,
                        _class="box_top")
 
         # Tabs to select between the modes
@@ -3393,7 +3363,7 @@ class S3ReferenceWidget(FormWidget):
         if self.search_existing:
             # TODO: Create a search form (Use autocomplete etc.?)
             pass
-        if self.one_to_many:
+        if self.one_to_many and self.allow_create:
             forms.append(INPUT(_type="button",
                                _value=T("Add one more"),
                                _class="new_nested_form",
@@ -3411,13 +3381,18 @@ class S3ReferenceWidget(FormWidget):
 
         hide_label_css = "#%s__label{display: none}" % _id
 
+        c, f = self.table._tablename.split("_", 1)
+
+        script = """$('#%s').dbReference('%s');""" % (_id, URL(c=c, f="%s/create" % f))
+
         #return TAG[""](TAG[""](*hidden_ids), form)
         return TAG[""](STYLE(hide_label_css),
                        TR(TAG[""](*hidden_ids)),  # Real input, which is hidden
                        label_row,
                        tab_rows,
                        TR(TD(TAG[""](*forms), _colspan=2), _class="box_middle"),
-                       divider
+                       divider,
+                       SCRIPT(script)
                       )
 
 # END =========================================================================
