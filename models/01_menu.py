@@ -14,12 +14,12 @@ if auth.permission.format in ("html"):
     menu.main(
 
         # Standard modules-menu
+        homepage("cap"),
         S3MainMenu.menu_modules(),
 
         # Custom menu (examples)
         #S3MainMenu.menu_climate(),
         #homepage(),
-        #homepage("gis"),
         #homepage("pr", restrict=[ADMIN])(
             #MM("Persons", f="person"),
             #MM("Groups", f="group")

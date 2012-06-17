@@ -1002,6 +1002,24 @@ class S3OptionsMenu:
                 )
 
     # -------------------------------------------------------------------------
+    def cap(self):
+        """ CAP menu """
+
+        T = current.T
+
+        session = current.session
+        ADMIN = session.s3.system_roles.ADMIN
+
+        return M(c="cap")(
+                    M("List All Alerts", f="alert")(
+                        M("Create Alert", f="alert", m="create"),
+                        M("Create CAP Profile", f="profile", m="create"),
+                        M("Create CAP Template", f="template", m="template"),
+                        M("Search", m="search"),
+                    )
+                )
+
+    # -------------------------------------------------------------------------
     def security(self):
         """ Security Management System """
 
