@@ -113,46 +113,57 @@ function s3_tb_refresh() {
         // Return only current record if field is autocomplete
         url += '&only_last=1';
     }
-    var value_high = 1;
-    var represent_high = '';
-    $.getJSONS3(url, function (data) {
-        var value, represent;
-        $.each(data['option'], function() {
-            value = this['@value'];
-            represent = this['$'];
-            if (typeof represent === 'undefined') {
-                represent = '';
+
+    // In the reference widget in cap module, we want to show all the
+    // information a sub-table entry contains
+    console.log(selector);
+    if (selector.is(".s3_reference")) {
+        url = S3.Ap.concat('/' + caller_prefix + '/' + parent_resource + '/' + child_resource + '.s3json?only_last=1');
+        $.getJSONS3(url, function(data) {
+            console.log(data);
+        });
+    } else {
+        var value_high = 1;
+        var represent_high = '';
+        $.getJSONS3(url, function (data) {
+            var value, represent;
+            $.each(data['option'], function() {
+                value = this['@value'];
+                represent = this['$'];
+                if (typeof represent === 'undefined') {
+                    represent = '';
+                }
+                if (dropdown) {
+                    append.push(["<option value='", value, "'>", represent, "</option>"].join(''));
+                }
+                // Type conversion: http://www.jibbering.com/faq/faq_notes/type_convert.html#tcNumber
+                numeric_value = (+value)
+                if (numeric_value > value_high) {
+                    value_high = numeric_value;
+                    represent_high = represent;
+                }
+            });
+            if (has_dummy) {
+                dummy.val(represent_high);
+                selector.val(value_high).change();
             }
             if (dropdown) {
-                append.push(["<option value='", value, "'>", represent, "</option>"].join(''));
+                // We have been called next to a drop-down
+                // Clean up the caller
+                options.remove();
+                selector.append(append.join('')).change();
             }
-            // Type conversion: http://www.jibbering.com/faq/faq_notes/type_convert.html#tcNumber
-            numeric_value = (+value)
-            if (numeric_value > value_high) {
-                value_high = numeric_value;
-                represent_high = represent;
-            }
+
+            // IE6 needs time for DOM to settle: http://csharperimage.jeremylikness.com/2009/05/jquery-ie6-and-could-not-set-selected.html
+            //setTimeout( function() {
+                    // Set the newly-created value (one with highest value)
+            //        selector.val(value_high).change();
+            //    }, 1);
+
+            // Clean-up
+            s3_tb_call_cleanup(caller);
         });
-        if (has_dummy) {
-            dummy.val(represent_high);
-            selector.val(value_high).change();
-        }
-        if (dropdown) {
-            // We have been called next to a drop-down
-            // Clean up the caller
-            options.remove();
-            selector.append(append.join('')).change();
-        }
-
-        // IE6 needs time for DOM to settle: http://csharperimage.jeremylikness.com/2009/05/jquery-ie6-and-could-not-set-selected.html
-        //setTimeout( function() {
-                // Set the newly-created value (one with highest value)
-        //        selector.val(value_high).change();
-        //    }, 1);
-
-        // Clean-up
-        s3_tb_call_cleanup(caller);
-    });
+    }
 }
 
 // Function to get the URL parameters
