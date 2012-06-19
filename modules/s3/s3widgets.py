@@ -3323,17 +3323,21 @@ class S3ReferenceWidget(StringWidget):
 
     def represent_item(self, record_id, _name):
         # TODO: Allow 2-step deleting of the record
-        form = SQLFORM(self.table,
-                       record = record_id,
-                       record_id = record_id,
-                       readonly = True,
-                       comments = False,
-                       deletable = False,
-                       showid = False,
-                       separator = "",
-                       _class="s3_reference_item")
-        form.tag = 'div'    # cannot have nested forms
-        form.update(_action=None, _enctype=None, _method=None)
+        T = current.T
+
+        try:
+            form = SQLFORM(self.table,
+                           record = record_id,
+                           record_id = record_id,
+                           readonly = True,
+                           comments = False,
+                           deletable = False,
+                           showid = True,
+                           separator = "",
+                           formstyle = "table3cols")
+            form.update(_action=None, _enctype=None, _method=None, _class="s3_reference_item")
+        except HTTP:
+            return DIV(T("Invalid item (probably deleted)."), _class="error s3_reference_item")
 
         return form
 
@@ -3345,7 +3349,6 @@ class S3ReferenceWidget(StringWidget):
 
         rows = [""]
         # for testing,
-        value = [1, 2]
         if isinstance(value, list):
             # one-to-many
             rows = [self.represent_item(val, _name) for val in value]

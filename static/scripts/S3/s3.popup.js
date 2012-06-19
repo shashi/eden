@@ -118,24 +118,21 @@ function s3_tb_refresh() {
     // In the reference widget in cap module, we want to show all the
     // information a sub-table entry contains
     if (selector.is('.s3_reference')) {
-        var form  = $(".form-container form"),
-            table = form.find("table"),
-            id    = form.find("input[name=id]").val();
+        var form  = $('.form-container form'),
+            table = form.find('table'),
+            id    = form.find('input[name=id]').val();
         if (!id) {
             // this should not happen
             return false;
         } else {
-            if (!selector.is('s3_reference_one_to_many')) {
-                var field = selector.find('.s3_reference_item').eq(0);
-                var item_table = table.clone();
-                field.val(id);
-                item_table.addClass('s3_reference_item');
-                selector.find('.s3_reference_item').eq(0).replaceWith(item_table);
+            if (!selector.is('.s3_reference_one_to_many')) {
+                var new_item = $('<div class="s3_reference_item"></div>');
+                console.log(form.children());
             } else {
                 // one to many.
                 var field = selector.find('.s3_reference_item:last').eq(0);
                 if (field.val()) {
-                    field.after(
+                }
             }
         }
     } else {
