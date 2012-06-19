@@ -3336,10 +3336,9 @@ class S3ReferenceWidget(StringWidget):
                            separator = "",
                            formstyle = "table3cols")
             form.update(_action=None, _enctype=None, _method=None, _class="s3_reference_item")
+            return form
         except HTTP:
             return DIV(T("Invalid item (probably deleted)."), _class="error s3_reference_item")
-
-        return form
 
     def __call__(self, field, value):
         T = current.T
@@ -3347,13 +3346,15 @@ class S3ReferenceWidget(StringWidget):
         _name = field.name
         _class = "s3_reference %s" % ["", "s3_reference_one_to_many"][self.one_to_many]
 
-        rows = [""]
+
         # for testing,
-        if isinstance(value, list):
+        if isinstance(value, list) and len(value) > 0:
             # one-to-many
             rows = [self.represent_item(val, _name) for val in value]
         elif value:
             rows = [self.represent_item(value, _name)]
+        else:
+            rows = [INPUT(_name=_name, _class="s3_reference_dummy", _type="hidden")]
 
         if self.search_existing:
             empty_msg = T("None selected yet.")
@@ -3361,7 +3362,7 @@ class S3ReferenceWidget(StringWidget):
             empty_msg = T("None added yet.")
 
         if value:
-            output = DIV(*rows, _id=_id, _class=_class)
+            output = DIV(TAG[""](*rows), _id=_id, _class=_class)
         else:
             output = DIV(rows[0], DIV(empty_msg, _class="s3_reference_empty_msg"), _id=_id, _class=_class)
 

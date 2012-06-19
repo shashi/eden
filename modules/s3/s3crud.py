@@ -277,7 +277,7 @@ class S3CRUD(S3Method):
                                     readonly=True,
                                     from_table=from_table,
                                     message=message,
-                                    format=representation)
+                                    format="plain")
 
             # Put the form into output
             output["form"] = form

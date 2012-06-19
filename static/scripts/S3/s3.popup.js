@@ -131,7 +131,14 @@ function s3_tb_refresh() {
             } else {
                 // one to many.
                 var field = selector.find('.s3_reference_item:last').eq(0);
-                if (field.val()) {
+                console.log(field);
+                if (field.length < 1) {
+                    var new_item = $('<div class="s3_reference_item"></div>');
+                    new_item.append(form.children());
+                    var $id = new_item.find('input[name=id]');
+                    $id.attr('name', selector.find(':hidden').eq(0).attr('name'));
+                    selector.append(new_item);
+                    selector.find('.s3_reference_dummy,.s3_reference_empty_msg').remove();
                 }
             }
         }
