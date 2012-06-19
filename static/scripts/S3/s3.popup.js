@@ -124,24 +124,28 @@ function s3_tb_refresh() {
         if (!id) {
             // this should not happen
             return false;
-        } else {
-            if (!selector.is('.s3_reference_one_to_many')) {
-                var new_item = $('<div class="s3_reference_item"></div>');
-                console.log(form.children());
-            } else {
-                // one to many.
-                var field = selector.find('.s3_reference_item:last').eq(0);
-                console.log(field);
-                if (field.length < 1) {
-                    var new_item = $('<div class="s3_reference_item"></div>');
-                    new_item.append(form.children());
-                    var $id = new_item.find('input[name=id]');
-                    $id.attr('name', selector.find(':hidden').eq(0).attr('name'));
-                    selector.append(new_item);
-                    selector.find('.s3_reference_dummy,.s3_reference_empty_msg').remove();
-                }
-            }
         }
+
+        var field = selector.find('.s3_reference_item:last').eq(0),
+            new_item = $('<div class="s3_reference_item"></div>'),
+            name = selector.find(':hidden').eq(0).attr('name');
+
+        new_item.append(form.children());
+        var $id = new_item.find('input[name=id]');
+        $id.attr('name', name);
+
+        if (selector.is('.s3_reference_one_to_many')) {
+            // one to many.
+            selector.append(new_item);
+        } else {
+            selector.find('.s3_reference_item').remove();
+            selector.append(new_item);
+        }
+
+        selector.find('.s3_reference_dummy,.s3_reference_empty_msg').remove();
+
+        // Clean-up
+        s3_tb_call_cleanup(caller);
     } else {
         var value_high = 1;
         var represent_high = '';

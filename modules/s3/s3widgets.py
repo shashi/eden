@@ -3332,11 +3332,16 @@ class S3ReferenceWidget(StringWidget):
                            readonly = True,
                            comments = False,
                            deletable = False,
-                           showid = True,
+                           showid = False,
                            separator = "",
                            formstyle = "table3cols")
-            form.update(_action=None, _enctype=None, _method=None, _class="s3_reference_item")
-            return form
+
+            return DIV(form[0],
+                       INPUT(_name=_name,
+                            _type="hidden",
+                            _value=record_id),
+                       _class="s3_reference_item")
+
         except HTTP:
             return DIV(T("Invalid item (probably deleted)."), _class="error s3_reference_item")
 
