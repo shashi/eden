@@ -271,6 +271,14 @@ class S3CRUD(S3Method):
             if self.settings.navigate_away_confirm:
                 form.append(SCRIPT("S3EnableNavigateAwayConfirm();"))
 
+            # In a popup show the newly created item in a readonly form
+            if r.representation == "popup" and self.resource.lastid:
+                form = self.sqlform(record_id=self.resource.lastid,
+                                    readonly=True,
+                                    from_table=from_table,
+                                    message=message,
+                                    format=representation)
+
             # Put the form into output
             output["form"] = form
 

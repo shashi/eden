@@ -3320,18 +3320,37 @@ class S3ReferenceWidget(StringWidget):
         self.search_existing = search_existing
         self.create_label = create_label or T("Create")
         self.search_label = search_label or T("Search")
+
+    def represent_item(self, record_id, _name):
+        # TODO: Allow 2-step deleting of the record
+        form = SQLFORM(self.table,
+                       record = record_id,
+                       record_id = record_id,
+                       readonly = True,
+                       comments = False,
+                       deletable = False,
+                       showid = False,
+                       separator = "",
+                       _class="s3_reference_item")
+        form.tag = 'div'    # cannot have nested forms
+        form.update(_action=None, _enctype=None, _method=None)
+
+        return form
+
     def __call__(self, field, value):
         T = current.T
         _id = "%s_%s" % (field._tablename, field.name)
         _name = field.name
         _class = "s3_reference %s" % ["", "s3_reference_one_to_many"][self.one_to_many]
 
-        rows = [INPUT(_id=_id,
-                      _class=_class,
-                      _name=_name,
-                      _type="hidden",
-                      _value=val,
-                      requires=field.requires) for val in value or ['']]
+        rows = [""]
+        # for testing,
+        value = [1, 2]
+        if isinstance(value, list):
+            # one-to-many
+            rows = [self.represent_item(val, _name) for val in value]
+        elif value:
+            rows = [self.represent_item(value, _name)]
 
         if self.search_existing:
             empty_msg = T("None selected yet.")
@@ -3339,9 +3358,9 @@ class S3ReferenceWidget(StringWidget):
             empty_msg = T("None added yet.")
 
         if value:
-            output = TAG[""](*rows)
+            output = DIV(*rows, _id=_id, _class=_class)
         else:
-            output = TAG[""](rows[0], DIV(empty_msg, _class="s3_reference_empty_msg"))
+            output = DIV(rows[0], DIV(empty_msg, _class="s3_reference_empty_msg"), _id=_id, _class=_class)
 
         return output
 

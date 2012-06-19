@@ -42,6 +42,7 @@ function s3_tb_refresh() {
         return;
     }
 
+
     var re = new RegExp('.*\\' + S3.Ap + '\\/');
 
     var child = $_GET['child'];
@@ -116,12 +117,27 @@ function s3_tb_refresh() {
 
     // In the reference widget in cap module, we want to show all the
     // information a sub-table entry contains
-    console.log(selector);
-    if (selector.is(".s3_reference")) {
-        url = S3.Ap.concat('/' + caller_prefix + '/' + parent_resource + '/' + child_resource + '.s3json?only_last=1');
-        $.getJSONS3(url, function(data) {
-            console.log(data);
-        });
+    if (selector.is('.s3_reference')) {
+        var form  = $(".form-container form"),
+            table = form.find("table"),
+            id    = form.find("input[name=id]").val();
+        if (!id) {
+            // this should not happen
+            return false;
+        } else {
+            if (!selector.is('s3_reference_one_to_many')) {
+                var field = selector.find('.s3_reference_item').eq(0);
+                var item_table = table.clone();
+                field.val(id);
+                item_table.addClass('s3_reference_item');
+                selector.find('.s3_reference_item').eq(0).replaceWith(item_table);
+            } else {
+                // one to many.
+                var field = selector.find('.s3_reference_item:last').eq(0);
+                if (field.val()) {
+                    field.after(
+            }
+        }
     } else {
         var value_high = 1;
         var represent_high = '';
