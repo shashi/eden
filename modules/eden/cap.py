@@ -32,6 +32,7 @@ __all__ = ["S3CAPModel"]
 from gluon import *
 from gluon.storage import Storage
 from ..s3 import *
+from eden.layouts import S3AddResourceLink
 
 # =============================================================================
 class S3CAPModel(S3Model):
@@ -419,9 +420,9 @@ class S3CAPModel(S3Model):
               _title="%s|%s" % (
                   T("Additional files supplimenting the alert message."),
                   T("")))
-        table.resource.widget = S3ReferenceWidget(current.db.cap_info_resource,
-                                                  one_to_many=True,
-                                                  use_iframe=True)
+        #table.resource.widget = S3ReferenceWidget(current.db.cap_info_resource,
+        #                                          one_to_many=True,
+        #                                          use_iframe=True)
 
 
         table.parameter.label = T("Parameters")
@@ -481,7 +482,7 @@ class S3CAPModel(S3Model):
                                   Field("addresses", "list:string"),
                                   Field("codes", "list:string"),
                                   Field("note", "text"),
-                                  Field("info", "list:reference cap_info"),
+                                  Field("info", "list:reference cap_info", required=True),
                                   Field("reference", "list:reference cap_alert"),
                                   Field("incidents"),
                                   *s3.meta_fields())
@@ -567,6 +568,10 @@ class S3CAPModel(S3Model):
         #table.addresses.widget = S3MultiSelect with the EDXL categories.
 
         table.info.widget = S3ReferenceWidget(current.db.cap_info, one_to_many=True, search_existing=False)
+        table.info.comment = S3AddResourceLink(c="cap",
+                                               f="info",
+                                               title=T("Add Information"),
+                                               tooltip=T("Information the alert must contain. You can add more than one item here.")),
         table.info.label = T("Alert Information")
 
         ADD_ALERT = T("Create CAP Alert")

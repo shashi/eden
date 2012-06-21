@@ -49,7 +49,8 @@ def cap_rest_controller():
 
 # =============================================================================
 def alert():
-    return cap_rest_controller()
+    output = s3_rest_controller()
+    return output
 def info():
     return cap_rest_controller()
 def info_resource():
