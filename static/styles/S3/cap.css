@@ -1,0 +1,21 @@
+/* core? */
+li {
+    list-style: none;
+}
+
+/* core */
+
+.w2p_fc {
+   float: right;
+}
+
+form {
+    background: inherit !important;
+}
+
+form table tr {
+    margin: 0 12px;
+    padding: 0 12px;
+}
+
+/* CAP Specific */

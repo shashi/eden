@@ -320,6 +320,10 @@ class S3CRUD(S3Method):
             exporter = S3PDF()
             return exporter(r, **attr)
 
+        elif representation == "json":
+            exporter = S3Exporter()
+            return exporter.json(resource)
+
         else:
             r.error(501, manager.ERROR.BAD_FORMAT)
 

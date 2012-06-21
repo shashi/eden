@@ -55,6 +55,8 @@ __all__ = ["S3HiddenWidget",
            "S3SearchAutocompleteWidget",
            "S3TimeIntervalWidget",
            "S3EmbedComponentWidget",
+           "S3KeyValueWidget",
+           "S3ReferenceWidget",
            "S3SliderWidget",
            "S3InvBinWidget",
            "s3_comments_widget",
@@ -1902,7 +1904,7 @@ S3.i18n.gis_country_required = '%s';""" % (country_snippet,
                                           )
 
         # The overall layout of the components
-        return TAG[""](
+        return TAG[""](TD(
                         TR(INPUT(**attr)),  # Real input, which is hidden
                         label_row,
                         tab_rows,
@@ -1919,7 +1921,7 @@ S3.i18n.gis_country_required = '%s';""" % (country_snippet,
                         TR(map_popup, TD(), _class="box_middle"),
                         SCRIPT(js_location_selector),
                         requires=requires
-                      )
+                      ), _colspan=2)
 
 # =============================================================================
 class S3LatLonWidget(DoubleWidget):
@@ -3268,5 +3270,185 @@ class S3OptionsMatrixWidget(FormWidget):
             current.response.s3.jquery_ready.append("$('#{0}').s3optionsmatrix();".format(attributes.get('_id')))
 
         return TABLE(header, TBODY(grid_rows), **attributes)
+
+# =============================================================================
+class S3KeyValueWidget(ListWidget):
+    """
+        Allows for input of key-value pairs and stores them as list:string
+    """
+
+    def __init__(self, key_label=None, value_label=None, delimiter="`"):
+        """
+            Returns a widget with key-value fields
+        """
+        self._class = 'key-value-pairs'
+        self.delimiter = delimiter
+        T = current.T
+
+        if key_label == None:
+            self.key_label = T("Key: ")
+        else:
+            self.key_label = key_label
+
+        if value_label == None:
+            self.value_label = T("Value: ")
+        else:
+            self.value_label = value_label
+
+    def __call__(self, field, value, **attributes):
+        T = current.T
+        _id = '%s_%s' % (field._tablename, field.name)
+        _name = field.name
+        _class = 'string'
+        requires = field.requires if isinstance(field.requires, (IS_NOT_EMPTY, IS_LIST_OF)) else None
+        items = []
+
+        for val in value or ['']:
+            kv = val.split(self.delimiter)
+            k = kv[0]
+            if len(kv)>1: v = kv[1]
+            else: v = ''
+
+            items.append(LI(
+                INPUT(_id=_id, _class=_class, _name=_name, _type="hidden", value=val, hideerror=True, requires=requires),
+                self.key_label,
+                INPUT(_class="key",   _type="text", _value=k), " ",
+                self.value_label,
+                INPUT(_class="value", _type="text", _value=v)
+            ))
+
+        attributes["_id"]=_id+"_kv_pairs"
+        attributes["_class"] = "key_value_widget"
+
+        return TAG[''](UL(*items,**attributes))
+
+# =============================================================================
+class S3ReferenceWidget(FormWidget):
+    """
+        Renders a reference or list:references field that references to another table
+    """
+
+    def __init__(self,
+                table,
+                one_to_many=False,
+                allow_create=True,
+                use_iframe=False,  # required for forms with file upload
+                search_existing=True,
+                create_label=None,
+                search_label=None):
+        T  = current.T
+        db = current.db
+
+        self.table = table
+        self.one_to_many = one_to_many
+        self.allow_create = allow_create
+        self.use_iframe=use_iframe
+        self.search_existing = search_existing
+        self.create_label = create_label or T("Create")
+        self.search_label = search_label or T("Search")
+
+    def create_form(self, _id):
+        #FIXME: Invalid html, but works anyway.
+        parts = []
+        if self.use_iframe:
+            _iframe = "%s_form_iframe"
+            parts.append(IFRAME(_id=_iframe, _name=_iframe,
+                         _style="height:0;width:0;border:none",
+                         _onLoad="s3_upload_iframe_response('%s')" % _iframe,
+                         _src=""))
+            form = TAG[""](
+                        SQLFORM(self.table, _target=_iframe),
+                        DIV(_iframe, _class="iframe_target", _style="display:none")
+                    )
+        else:
+            form = SQLFORM(self.table)
+
+        return OL(LI(form, _class="nested_form"),
+                   _class="nested_forms %s" % ["", "with_iframe"][self.use_iframe],
+                   _id="%s_nested_forms" % _id)
+
+    def __call__(self, field, value):
+        """
+            Show a tabbed view with a form for the table, and a search tab if search_existing=True
+            Button append multiple forms if one_to_many=True 
+        """
+        T  = current.T
+        db = current.db
+
+        _id = '%s_%s' % (field._tablename, field.name)
+        _name = field.name
+        _class = 'string'
+
+        # If allow_create is true and the same table is referenced, this
+        # gives a infinite recursive process. So check it and error out.
+        if self.allow_create and field._tablename == self.table._tablename:
+            raise ValueError("You cannot use the parent table as a reference and have a create form too.")
+
+        # Components to inject into Form
+        divider = TR(TD(_class="subheading"), TD(),
+                     _class="box_bottom ref_select")
+        expand_button = DIV(_id="%s_expand" % _id, _class="expand")
+
+        label_row = TR(TD(expand_button, B("%s:" % field.label)),
+                       TD(),
+                       _id="%s_label_row" % _id,
+                       _class="box_top")
+
+        # Tabs to select between the modes
+        create_button = A(self.create_label,
+                        _style="cursor:pointer; cursor:hand",
+                        _id="%s_create-btn" % self.table._tablename)
+
+        search_button = A(self.search_label,
+                        _style="cursor:pointer; cursor:hand",
+                        _id="%s_search-btn" % self.table._tablename)
+
+        tabs = DIV(SPAN(create_button, _id="%s_add_tab" % self.table._tablename,
+                        _class="tab_here %s" % ["hidden", ""][self.allow_create or self.use_iframe]),
+                   SPAN(search_button, _id="%s_search_tab" % self.table._tablename,
+                        _class="tab_last %s" % ["hidden", ""][self.search_existing]),
+                   _class="tabs")
+
+        tab_rows = TR(TD(tabs), TD(),
+                      _id="%s_tabs_row" % self.table._tablename,
+                      _class="ref_select box_middle")
+
+        forms = []
+        if self.allow_create:
+            forms.append(self.create_form(_id))
+        if self.search_existing:
+            # TODO: Create a search form (Use autocomplete etc.?)
+            pass
+        if self.one_to_many and self.allow_create:
+            forms.append(INPUT(_type="button",
+                               _value=T("Add one more"),
+                               _class="new_nested_form",
+                               _id="%s_new_item" % _id,
+                               _name="%s_new_item" %_id))
+
+        if self.one_to_many:
+            values = value or ['']
+        else:
+            values = [value or '']
+
+        # actual fields are hidden
+        hidden_ids = [INPUT(_type="hidden", _id=_id, _name=_name, \
+                        _class=_class, _value=v) for v in values]
+
+        hide_label_css = "#%s__label{display: none}" % _id
+
+        c, f = self.table._tablename.split("_", 1)
+
+        script = """$('#%s').dbReference('%s');""" % (_id, URL(c=c, f="%s/create" % f))
+
+        #return TAG[""](TAG[""](*hidden_ids), form)
+        return TAG[""](STYLE(hide_label_css),
+                       TR(TAG[""](*hidden_ids)),  # Real input, which is hidden
+                       label_row,
+                       tab_rows,
+                       TR(TD(TAG[""](*forms), _colspan=2), _class="box_middle"),
+                       divider,
+                       SCRIPT(script)
+                      )
 
 # END =========================================================================
