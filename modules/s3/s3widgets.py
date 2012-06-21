@@ -56,7 +56,6 @@ __all__ = ["S3HiddenWidget",
            "S3TimeIntervalWidget",
            "S3EmbedComponentWidget",
            "S3KeyValueWidget",
-           "S3ReferenceWidget",
            "S3SliderWidget",
            "S3InvBinWidget",
            "s3_comments_widget",
@@ -3351,82 +3350,5 @@ jQuery(document).ready(function(){jQuery('#%s_kv_pairs').kv_pairs("%s", "%s", "%
         attributes['_id']=_id+'_kv_pairs'
 
         return TAG[''](UL(*items,**attributes),script)
-
-# =============================================================================
-class S3ReferenceWidget(StringWidget):
-    """
-        Renders a reference or list:references field that references to another table
-    """
-
-    def __init__(self,
-                table,
-                one_to_many=False,
-                allow_create=True,
-                use_iframe=False,  # required for forms with file upload
-                search_existing=True,
-                create_label=None,
-                search_label=None):
-        T  = current.T
-        db = current.db
-
-        self.table = table
-        self.one_to_many = one_to_many
-        self.allow_create = allow_create
-        self.use_iframe=use_iframe
-        self.search_existing = search_existing
-        self.create_label = create_label or T("Create")
-        self.search_label = search_label or T("Search")
-
-    def represent_item(self, record_id, _name):
-        # TODO: Allow 2-step deleting of the record
-        T = current.T
-
-        try:
-            form = SQLFORM(self.table,
-                           record = record_id,
-                           record_id = record_id,
-                           readonly = True,
-                           comments = False,
-                           deletable = False,
-                           showid = False,
-                           separator = "",
-                           formstyle = "table3cols")
-
-            return DIV(form[0],
-                       INPUT(_name=_name,
-                            _type="hidden",
-                            _value=record_id),
-                       _class="s3_reference_item")
-
-        except HTTP:
-            return DIV(T("Invalid item (probably deleted)."), _class="error s3_reference_item")
-
-    def __call__(self, field, value):
-        T = current.T
-        _id = "%s_%s" % (field._tablename, field.name)
-        _name = field.name
-        _class = "s3_reference %s" % ["", "s3_reference_one_to_many"][self.one_to_many]
-
-
-        # for testing,
-        if isinstance(value, list) and len(value) > 0:
-            # one-to-many
-            rows = [self.represent_item(val, _name) for val in value]
-        elif value:
-            rows = [self.represent_item(value, _name)]
-        else:
-            rows = [INPUT(_name=_name, _class="s3_reference_dummy", _type="hidden")]
-
-        if self.search_existing:
-            empty_msg = T("None selected yet.")
-        else:
-            empty_msg = T("None added yet.")
-
-        if value:
-            output = DIV(TAG[""](*rows), _id=_id, _class=_class)
-        else:
-            output = DIV(rows[0], DIV(empty_msg, _class="s3_reference_empty_msg"), _id=_id, _class=_class)
-
-        return output
 
 # END =========================================================================

@@ -42,7 +42,6 @@ function s3_tb_refresh() {
         return;
     }
 
-
     var re = new RegExp('.*\\' + S3.Ap + '\\/');
 
     var child = $_GET['child'];
@@ -114,80 +113,46 @@ function s3_tb_refresh() {
         // Return only current record if field is autocomplete
         url += '&only_last=1';
     }
-
-    // In the reference widget in cap module, we want to show all the
-    // information a sub-table entry contains
-    if (selector.is('.s3_reference')) {
-        var form  = $('.form-container form'),
-            table = form.find('table'),
-            id    = form.find('input[name=id]').val();
-        if (!id) {
-            // this should not happen
-            return false;
+    var value_high = 1;
+    var represent_high = '';
+    $.getJSONS3(url, function (data) {
+        var value, represent;
+        $.each(data['option'], function() {
+            value = this['@value'];
+            represent = this['$'];
+            if (typeof represent === 'undefined') {
+                represent = '';
+            }
+            if (dropdown) {
+                append.push(["<option value='", value, "'>", represent, "</option>"].join(''));
+            }
+            // Type conversion: http://www.jibbering.com/faq/faq_notes/type_convert.html#tcNumber
+            numeric_value = (+value)
+            if (numeric_value > value_high) {
+                value_high = numeric_value;
+                represent_high = represent;
+            }
+        });
+        if (has_dummy) {
+            dummy.val(represent_high);
+            selector.val(value_high).change();
+        }
+        if (dropdown) {
+            // We have been called next to a drop-down
+            // Clean up the caller
+            options.remove();
+            selector.append(append.join('')).change();
         }
 
-        var field = selector.find('.s3_reference_item:last').eq(0),
-            new_item = $('<div class="s3_reference_item"></div>'),
-            name = selector.find(':hidden').eq(0).attr('name');
-
-        new_item.append(form.children());
-        var $id = new_item.find('input[name=id]');
-        $id.attr('name', name);
-
-        if (selector.is('.s3_reference_one_to_many')) {
-            // one to many.
-            selector.append(new_item);
-        } else {
-            selector.find('.s3_reference_item').remove();
-            selector.append(new_item);
-        }
-
-        selector.find('.s3_reference_dummy,.s3_reference_empty_msg').remove();
+        // IE6 needs time for DOM to settle: http://csharperimage.jeremylikness.com/2009/05/jquery-ie6-and-could-not-set-selected.html
+        //setTimeout( function() {
+                // Set the newly-created value (one with highest value)
+        //        selector.val(value_high).change();
+        //    }, 1);
 
         // Clean-up
         s3_tb_call_cleanup(caller);
-    } else {
-        var value_high = 1;
-        var represent_high = '';
-        $.getJSONS3(url, function (data) {
-            var value, represent;
-            $.each(data['option'], function() {
-                value = this['@value'];
-                represent = this['$'];
-                if (typeof represent === 'undefined') {
-                    represent = '';
-                }
-                if (dropdown) {
-                    append.push(["<option value='", value, "'>", represent, "</option>"].join(''));
-                }
-                // Type conversion: http://www.jibbering.com/faq/faq_notes/type_convert.html#tcNumber
-                numeric_value = (+value)
-                if (numeric_value > value_high) {
-                    value_high = numeric_value;
-                    represent_high = represent;
-                }
-            });
-            if (has_dummy) {
-                dummy.val(represent_high);
-                selector.val(value_high).change();
-            }
-            if (dropdown) {
-                // We have been called next to a drop-down
-                // Clean up the caller
-                options.remove();
-                selector.append(append.join('')).change();
-            }
-
-            // IE6 needs time for DOM to settle: http://csharperimage.jeremylikness.com/2009/05/jquery-ie6-and-could-not-set-selected.html
-            //setTimeout( function() {
-                    // Set the newly-created value (one with highest value)
-            //        selector.val(value_high).change();
-            //    }, 1);
-
-            // Clean-up
-            s3_tb_call_cleanup(caller);
-        });
-    }
+    });
 }
 
 // Function to get the URL parameters

@@ -32,7 +32,6 @@ __all__ = ["S3CAPModel"]
 from gluon import *
 from gluon.storage import Storage
 from ..s3 import *
-from eden.layouts import S3AddResourceLink
 
 # =============================================================================
 class S3CAPModel(S3Model):
@@ -438,7 +437,7 @@ class S3CAPModel(S3Model):
               _title="%s|%s" % (
                   T("The affected area of the alert"),
                   T("")))
-        table.area.widget = S3ReferenceWidget(current.db.cap_info_area, one_to_many=True)
+        #table.area.widget = S3ReferenceWidget(current.db.cap_info_area, one_to_many=True)
 
         # ---------------------------------------------------------------------
         tablename = "cap_alert"
@@ -558,7 +557,7 @@ class S3CAPModel(S3Model):
               _title="%s|%s" % (
                   T("The group listing identifying earlier message(s) referenced by the alert message"),
                   T("The extended message identifier(s) (in the form sender,identifier,sent) of an earlier CAP message or messages referenced by this one.")))
-        table.reference.widget = S3ReferenceWidget(table, one_to_many=True, allow_create=False)
+        #table.reference.widget = S3ReferenceWidget(table, one_to_many=True, allow_create=False)
 
         table.incidents.comment = DIV(
               _class="tooltip",
@@ -567,11 +566,7 @@ class S3CAPModel(S3Model):
                   T("Used to collate multiple messages referring to different aspects of the same incident. If multie incident identifiers are referenced, they SHALL be separated by whitespace.  Incident names including whitespace SHALL be surrounded by double-quotes.")))
         #table.addresses.widget = S3MultiSelect with the EDXL categories.
 
-        table.info.widget = S3ReferenceWidget(current.db.cap_info, one_to_many=True, search_existing=False)
-        table.info.comment = S3AddResourceLink(c="cap",
-                                               f="info",
-                                               title=T("Add Information"),
-                                               tooltip=T("Information the alert must contain. You can add more than one item here.")),
+        #table.info.widget = S3ReferenceWidget(current.db.cap_info, one_to_many=True, search_existing=False)
         table.info.label = T("Alert Information")
 
         ADD_ALERT = T("Create CAP Alert")
