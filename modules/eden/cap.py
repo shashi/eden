@@ -27,7 +27,11 @@
     OTHER DEALINGS IN THE SOFTWARE.
 """
 
-__all__ = ["S3CAPModel"]
+__all__ = ["S3CAPModel",
+           "cap_alert_rheader",
+           "cap_alert_controller",
+           "cap_info_rheader",
+           "cap_info_controller"]
 
 from gluon import *
 from gluon.storage import Storage
@@ -55,6 +59,8 @@ class S3CAPModel(S3Model):
 
         location_id = self.gis_location_id
         message_id = self.msg_message_id
+        db = current.db
+        add_component = self.add_component
 
         tablename = "msg_report"
         table = self.define_table(tablename,
@@ -65,121 +71,174 @@ class S3CAPModel(S3Model):
                                   *s3.meta_fields())
 
         # ---------------------------------------------------------------------
-        tablename = "cap_info_resource"
-        table = self.define_table(tablename, 
-                                  Field("resource_desc", required=True),
-                                  Field("mime_type", notnull=True),
-                                  Field("size", "integer"),
-                                  Field("uri"), # needs a special validation
-                                  Field("file", "upload"),
-                                  # XXX: Should this be made per-info instead of per-file?
-                                  Field("base64encode", "boolean"),
-                                  #Field("deref_uri", "text"), <-- base 64 encoded
-                                  Field("digest"),
-                                  *s3.meta_fields())
+        tablename = "cap_alert"
 
+        # CAP alert Status Code (status)
+        cap_alert_status_code_opts = {
+            "Actual":T("Actual - actionable by all targeted recipients"),
+            "Exercise":T("Exercise - only for designated participants (decribed in note)"),
+            "System":T("System - for internal functions"),
+            "Test":T("Test - testing, all recipients disregard"),
+            "Draft":T("Draft - not actionable in its current form"),
+        }
+        # CAP alert message type (msgType)
+        cap_alert_msgType_code_opts = {
+            "Alert":T("Alert: Initial information requiring attention by targeted recipients"),
+            "Update":T("Update: Update and supercede earlier message(s)"),
+            "Cancel":T("Cancel: Cancel earlier message(s)"),
+            "Ack":T("Ack: Acknowledge receipt and acceptance of the message(s)"),
+            "Error":T("Error: Indicate rejection of the message(s)"),
+        }
+        # CAP alert scope
+        cap_alert_scope_code_opts = {
+            "Public": "Public - unrestricted audiences",
+            "Restricted": "Restricted - to users with a known operational requirement (described in restriction)",
+            "Private": "Private - only to specified addresses (mentioned in addresses)"
+        }
 
-        table.resource_desc.comment = DIV(
-              _class="tooltip",
-              _title="%s|%s" % (
-                  T("The type and content of the resource file"),
-                  T("The human-readable text describing the type and content, such as 'map' or 'photo', of the resource file.")))
-
-
-        table.mime_type.comment = DIV(
-              _class="tooltip",
-              _title="%s|%s" % (
-                  T("The identifier of the MIME content type and sub-type describing the resource file"),
-                  T("MIME content type and sub-type as described in [RFC 2046]. (As of this document, the current IANA registered MIME types are listed at http://www.iana.org/assignments/media-types/)")))
-
-
-        table.size.writable = False
-        table.size.comment = DIV(
-              _class="tooltip",
-              _title="%s|%s" % (
-                  T("The integer indicating the size of the resource file"),
-                  T("Approximate size of the resource file in bytes.")))
-
-        # fixme: This should be handled under the hood
-        table.uri.writable = False
-        table.uri.comment = DIV(
-              _class="tooltip",
-              _title="%s|%s" % (
-                  T("The identifier of the hyperlink for the resource file"),
-                  T("A full absolute URI, typically a Uniform Resource Locator that can be used to retrieve the resource over the Internet.")))
-
-
-        #table.deref_uri.writable = False
-        #table.deref_uri.readable = False
-
-        table.base64encode.label = T("Encode in message?")
-        table.base64encode.comment = DIV(
-              _class="tooltip",
-              _title="%s|%s" % (
-                  T("Should this file be encoded into the CAP Message and sent?"),
-                  T("Selecting this will encode the file in Base 64 encoding (which converts it into text) and sends it embedded in the CAP message. This is useful in one-way network where the sender cannot create URLs publicly accessible over the internet.")))
-
-
-        table.digest.writable=False
-        table.digest.comment = DIV(
-              _class="tooltip",
-              _title="%s|%s" % (
-                  T("The code representing the digital digest ('hash') computed from the resource file"),
-                  T("Calculated using the Secure Hash Algorithm (SHA-1).")))
-
-
-        # ---------------------------------------------------------------------
-        tablename = "cap_info_area"
-        # FIXME: Use gis_location here and convert wkt to WGS84
         table = self.define_table(tablename,
-                                  Field("area_desc", required=True),
-                                  Field("polygon", "text"),
-                                  Field("circle"),
-                                  Field("geocode", "list:string"),
-                                  Field("altitude", "integer"),
-                                  Field("ceiling", "integer"),
+                                  # identifier string, as was recieved.
+                                  Field("identifier", unique=True),
+                                  Field("sender"),
+                                  Field("sent",
+                                        "datetime",
+                                        writable=False,
+                                        readable=False),
+                                  Field("status",
+                                        requires=IS_IN_SET(cap_alert_status_code_opts)),
+                                  Field("msg_type",
+                                        requires=IS_IN_SET(cap_alert_msgType_code_opts)),
+                                  Field("source"),
+                                  Field("scope",
+                                        requires=IS_IN_SET(cap_alert_scope_code_opts)),
+                                  Field("restriction", "text"), # text decribing the restriction for scope=restricted
+                                  Field("addresses", "list:string"),
+                                  Field("codes", "list:string"),
+                                  Field("note", "text"),
+                                  Field("reference",
+                                        "list:reference cap_alert",
+                                        represent=self.alert_reference_represent),
+                                  Field("incidents"),
                                   *s3.meta_fields())
 
-        table.area_desc.comment = DIV(
+        alert_requires = IS_NULL_OR(IS_ONE_OF(db,
+                                              "cap_alert.id",
+                                              label = self.alert_represent,
+                                              sort=True))
+
+        alert_id = S3ReusableField("alert_id",
+                                   db.cap_alert,
+                                   sortby="identifier",
+                                   requires=alert_requires,
+                                   represent=self.alert_represent,
+                                   label = T("Alert"),
+                                   comment = T("The alert message containing this information"),
+                                   ondelete = "RESTRICT")
+
+        # CAP Informations as component of Alerts
+        add_component("cap_info", cap_alert="alert_id")
+
+        table.identifier.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
-                  T("The affected area of the alert message"),
-                  T("A text description of the affected area.")))
+                  T("A unique identifier of the alert message"),
+                  T("A number or string uniquely identifying this message, assigned by the sender. Must notnclude spaces, commas or restricted characters (< and &).")))
 
-
-        table.polygon.comment = DIV(
+        table.sender.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
-                  T("Points defining a polygon that delineates the affected area"),
-                  T("")))
+                  T("The identifier of the sender of the alert message"),
+                  T("This is guaranteed by assigner to be unique globally; e.g., may be based on an Internet domain name. Must not include spaces, commas or restricted characters (< and &).")))
 
-
-        table.circle.comment = DIV(
+        table.status.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
-                  T("A point and radius delineating the affected area"),
-                  T("The circular area is represented by a central point given as a coordinate pair followed by a radius value in kilometers.")))
+                  T("Denotes the appropriate handling of the alert message"),
+                  T("See options.")))
 
-
-        table.geocode.comment = DIV(
+        table.msg_type.label = T("Message Type")
+        table.msg_type.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
-                  T("The geographic code delineating the affected area"),
-                  T("Any geographically-based code to describe a message target area, in the form. The key is a user-assigned string designating the domain of the code, and the content of value is a string (which may represent a number) denoting the value itself (e.g., name='ZIP' and value='54321'). This should be used in concert with an equivalent description in the more universally understood polygon and circle forms whenever possible.")))
-        table.geocode.widget = S3KeyValueWidget()
+                  T("The nature of the alert message"),
+                  T("See options.")))
 
-        table.altitude.comment = DIV(
+        table.source.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
-                  T("The specific or minimum altitude of the affected area"),
-                  T("If used with the ceiling element this value is the lower limit of a range. Otherwise, this value specifies a specific altitude. The altitude measure is in feet above mean sea level.")))
+                  T("The text identifying the source of the alert message"),
+                  T("The particular source of this alert; e.g., an operator or a specific device.")))
 
-
-        table.ceiling.comment = DIV(
+        table.scope.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
-                  T("The maximum altitude of the affected area"),
-                  T("must not be used except in combination with the 'altitude' element. The ceiling measure is in feet above mean sea level.")))
+                  T("Denotes the intended distribution of the alert message"),
+                  T("Who is this alert for?")))
+
+        table.restriction.comment = DIV(
+              _class="tooltip",
+              _title="%s|%s" % (
+                  T("The text describing the rule for limiting distribution of the restricted alert message"),
+                  T("Used when scope is 'Restricted'.")))
+
+        #todo: provide a better way to add multiple addresses, do not ask the user to delimit it themselves
+        #      this should eventually use the CAP contacts
+        table.addresses.comment = DIV(
+              _class="tooltip",
+              _title="%s|%s" % (
+                  T("The group listing of intended recipients of the alert message"),
+                  T("Required when scope is 'Private', optional when scope is 'Public' or 'Restricted'. Each recipient shall be identified by an identifier or an address.")))
+        table.addresses.label = T("Recipients")
+        #table.addresses.widget = S3CAPAddressesWidget
+
+        table.codes.comment = DIV(
+              _class="tooltip",
+              _title="%s|%s" % (
+                  T("Codes for special handling of the message"),
+                  T("Any user-defined flags or special codes used to flag the alert message for special handling.")))
+        table.codes.widget = S3KeyValueWidget()
+
+        table.note.comment = DIV(
+              _class="tooltip",
+              _title="%s|%s" % (
+                  T("The text describing the purpose or significance of the alert message"),
+                  T("The message note is primarily intended for use with status 'Exercise' and message type 'Error'")))
+
+        # FIXME: this should not be manually entered, needs a widget
+        table.reference.comment = DIV(
+              _class="tooltip",
+              _title="%s|%s" % (
+                  T("The group listing identifying earlier message(s) referenced by the alert message"),
+                  T("The extended message identifier(s) (in the form sender,identifier,sent) of an earlier CAP message or messages referenced by this one.")))
+        #table.reference.widget = S3ReferenceWidget(table, one_to_many=True, allow_create=False)
+
+        table.incidents.comment = DIV(
+              _class="tooltip",
+              _title="%s|%s" % (
+                  T("A list of incident(s) referenced by the alert message"),
+                  T("Used to collate multiple messages referring to different aspects of the same incident. If multie incident identifiers are referenced, they SHALL be separated by whitespace.  Incident names including whitespace SHALL be surrounded by double-quotes.")))
+        #table.addresses.widget = S3MultiSelect with the EDXL categories.
+
+        #table.info.widget = S3ReferenceWidget(current.db.cap_info, one_to_many=True, search_existing=False)
+
+        ADD_ALERT = T("Create CAP Alert")
+        LIST_ALERTS = T("List alerts")
+        s3.crud_strings[tablename] = Storage(
+            title_create = ADD_ALERT,
+            title_display = T("CAP Alert"),
+            title_list = LIST_ALERTS,
+            title_update = T("Update CAP alert"), # this will create a new "Update" alert?
+            title_upload = T("Import CAP Alerts"),
+            title_search = T("Search CAP Alerts"),
+            subtitle_create = T("Create and Broadcast CAP Alert"),
+            subtitle_list = T("Listing of CAP Alerts created and received"),
+            label_list_button = LIST_ALERTS,
+            label_create_button = ADD_ALERT,
+            label_delete_button = T("Delete CAP Alert"),
+            msg_record_created = T("CAP alert created"),
+            msg_record_modified = T("CAP alert modified"),
+            msg_record_deleted = T("CAP alert deleted"),
+            msg_list_empty = T("No CAP alerts to show"))
 
         # ---------------------------------------------------------------------
         tablename = "cap_info"
@@ -237,6 +296,7 @@ class S3CAPModel(S3Model):
         }
 
         table = self.define_table(tablename,
+                                  alert_id(),
                                   Field("language"),
                                   Field("category", "text",
                                         requires=IS_IN_SET(cap_info_category_opts,
@@ -269,9 +329,22 @@ class S3CAPModel(S3Model):
                                   Field("contact", "text"),
                                   Field("web", requires=IS_NULL_OR(IS_URL())),
                                   Field("parameter", "list:string"),
-                                  Field("resource", "list:reference cap_info_resource"),
-                                  Field("area", "list:reference cap_info_area"),
                                   *s3.meta_fields())
+
+        info_requires = IS_NULL_OR(IS_ONE_OF(db,
+                                            "cap_info.id",
+                                            label = self.info_represent,
+                                            sort=True))
+
+        info_id = S3ReusableField("info_id",
+                                  db.cap_info,
+                                  sortby="identifier",
+                                  requires=info_requires,
+                                  represent=self.info_represent,
+                                  label = T("Alert Information"),
+                                  comment = T("The alert information"),
+                                  ondelete = "RESTRICT")
+
 
         table.language.comment = DIV(
               _class="tooltip",
@@ -414,11 +487,11 @@ class S3CAPModel(S3Model):
                   T("The contact for follow-up and confirmation of the alert message"),
                   T("")))
 
-        table.resource.comment = DIV(
-              _class="tooltip",
-              _title="%s|%s" % (
-                  T("Additional files supplimenting the alert message."),
-                  T("")))
+        #table.resource.comment = DIV(
+        #      _class="tooltip",
+        #      _title="%s|%s" % (
+        #          T("Additional files supplimenting the alert message."),
+        #          T("")))
         #table.resource.widget = S3ReferenceWidget(current.db.cap_info_resource,
         #                                          one_to_many=True,
         #                                          use_iframe=True)
@@ -432,163 +505,306 @@ class S3CAPModel(S3Model):
                   T("Any system-specific datum, in the form of key-value pairs.")))
         table.parameter.widget = S3KeyValueWidget()
 
-        table.area.comment = DIV(
-              _class="tooltip",
-              _title="%s|%s" % (
-                  T("The affected area of the alert"),
-                  T("")))
+        #table.area.comment = DIV(
+        #      _class="tooltip",
+        #      _title="%s|%s" % (
+        #          T("The affected area of the alert"),
+        #          T("")))
         #table.area.widget = S3ReferenceWidget(current.db.cap_info_area, one_to_many=True)
 
         # ---------------------------------------------------------------------
-        tablename = "cap_alert"
-
-        # CAP alert Status Code (status)
-        cap_alert_status_code_opts = {
-            "Actual":T("Actual - actionable by all targeted recipients"),
-            "Exercise":T("Exercise - only for designated participants (decribed in note)"),
-            "System":T("System - for internal functions"),
-            "Test":T("Test - testing, all recipients disregard"),
-            "Draft":T("Draft - not actionable in its current form"),
-        }
-        # CAP alert message type (msgType)
-        cap_alert_msgType_code_opts = {
-            "Alert":T("Alert: Initial information requiring attention by targeted recipients"),
-            "Update":T("Update: Update and supercede earlier message(s)"),
-            "Cancel":T("Cancel: Cancel earlier message(s)"),
-            "Ack":T("Ack: Acknowledge receipt and acceptance of the message(s)"),
-            "Error":T("Error: Indicate rejection of the message(s)"),
-        }
-        # CAP alert scope
-        cap_alert_scope_code_opts = {
-            "Public": "Public - unrestricted audiences",
-            "Restricted": "Restricted - to users with a known operational requirement (described in restriction)",
-            "Private": "Private - only to specified addresses (mentioned in addresses)"
-        }
-
+        tablename = "cap_info_resource"
         table = self.define_table(tablename,
-                                  # identifier string, as was recieved.
-                                  Field("identifier", unique=True),
-                                  Field("sender"),
-                                  Field("sent", "datetime", writable=False, readable=False), # this is maintained by the system
-                                  Field("status",
-                                        requires=IS_IN_SET(cap_alert_status_code_opts)),
-                                  Field("msg_type",
-                                        requires=IS_IN_SET(cap_alert_msgType_code_opts)),
-                                  Field("source"),
-                                  Field("scope",
-                                        requires=IS_IN_SET(cap_alert_scope_code_opts)),
-                                  Field("restriction", "text"), # text decribing the restriction for scope=restricted
-                                  Field("addresses", "list:string"),
-                                  Field("codes", "list:string"),
-                                  Field("note", "text"),
-                                  Field("info", "list:reference cap_info", required=True),
-                                  Field("reference", "list:reference cap_alert"),
-                                  Field("incidents"),
+                                  info_id(),
+                                  Field("resource_desc", required=True),
+                                  Field("mime_type", notnull=True),
+                                  Field("size", "integer"),
+                                  Field("uri"), # needs a special validation
+                                  Field("file", "upload"),
+                                  # XXX: Should this be made per-info instead of per-file?
+                                  Field("base64encode", "boolean"),
+                                  #Field("deref_uri", "text"), <-- base 64 encoded
+                                  Field("digest"),
                                   *s3.meta_fields())
-        table.identifier.comment = DIV(
+
+
+        table.resource_desc.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
-                  T("A unique identifier of the alert message"),
-                  T("A number or string uniquely identifying this message, assigned by the sender. Must notnclude spaces, commas or restricted characters (< and &).")))
+                  T("The type and content of the resource file"),
+                  T("The human-readable text describing the type and content, such as 'map' or 'photo', of the resource file.")))
 
-        table.sender.comment = DIV(
+
+        table.mime_type.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
-                  T("The identifier of the sender of the alert message"),
-                  T("This is guaranteed by assigner to be unique globally; e.g., may be based on an Internet domain name. Must not include spaces, commas or restricted characters (< and &).")))
+                  T("The identifier of the MIME content type and sub-type describing the resource file"),
+                  T("MIME content type and sub-type as described in [RFC 2046]. (As of this document, the current IANA registered MIME types are listed at http://www.iana.org/assignments/media-types/)")))
 
-        table.status.comment = DIV(
+
+        table.size.writable = False
+        table.size.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
-                  T("Denotes the appropriate handling of the alert message"),
-                  T("See options.")))
+                  T("The integer indicating the size of the resource file"),
+                  T("Approximate size of the resource file in bytes.")))
 
-        table.msg_type.label = T("Message Type")
-        table.msg_type.comment = DIV(
+        # fixme: This should be handled under the hood
+        table.uri.writable = False
+        table.uri.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
-                  T("The nature of the alert message"),
-                  T("See options.")))
+                  T("The identifier of the hyperlink for the resource file"),
+                  T("A full absolute URI, typically a Uniform Resource Locator that can be used to retrieve the resource over the Internet.")))
 
-        table.source.comment = DIV(
+
+        #table.deref_uri.writable = False
+        #table.deref_uri.readable = False
+
+        table.base64encode.label = T("Encode in message?")
+        table.base64encode.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
-                  T("The text identifying the source of the alert message"),
-                  T("The particular source of this alert; e.g., an operator or a specific device.")))
+                  T("Should this file be encoded into the CAP Message and sent?"),
+                  T("Selecting this will encode the file in Base 64 encoding (which converts it into text) and sends it embedded in the CAP message. This is useful in one-way network where the sender cannot create URLs publicly accessible over the internet.")))
 
-        table.scope.comment = DIV(
+
+        table.digest.writable=False
+        table.digest.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
-                  T("Denotes the intended distribution of the alert message"),
-                  T("Who is this alert for?")))
+                  T("The code representing the digital digest ('hash') computed from the resource file"),
+                  T("Calculated using the Secure Hash Algorithm (SHA-1).")))
 
-        table.restriction.comment = DIV(
+        # Resource as component of Information
+        add_component("cap_info_resource", cap_info="info_id")
+
+        # ---------------------------------------------------------------------
+        tablename = "cap_info_area"
+        # FIXME: Use gis_location here and convert wkt to WGS84
+        table = self.define_table(tablename,
+                                  info_id(),
+                                  Field("area_desc", required=True),
+                                  Field("polygon", "text"),
+                                  Field("circle"),
+                                  Field("geocode", "list:string"),
+                                  Field("altitude", "integer"),
+                                  Field("ceiling", "integer"),
+                                  *s3.meta_fields())
+
+        table.area_desc.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
-                  T("The text describing the rule for limiting distribution of the restricted alert message"),
-                  T("Used when scope is 'Restricted'.")))
+                  T("The affected area of the alert message"),
+                  T("A text description of the affected area.")))
 
-        #todo: provide a better way to add multiple addresses, do not ask the user to delimit it themselves
-        #      this should eventually use the CAP contacts
-        table.addresses.comment = DIV(
+
+        table.polygon.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
-                  T("The group listing of intended recipients of the alert message"),
-                  T("Required when scope is 'Private', optional when scope is 'Public' or 'Restricted'. Each recipient shall be identified by an identifier or an address.")))
-        table.addresses.label = T("Recipients")
-        #table.addresses.widget = S3CAPAddressesWidget
+                  T("Points defining a polygon that delineates the affected area"),
+                  T("")))
 
-        table.codes.comment = DIV(
+
+        table.circle.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
-                  T("Codes for special handling of the message"),
-                  T("Any user-defined flags or special codes used to flag the alert message for special handling.")))
-        table.codes.widget = S3KeyValueWidget()
+                  T("A point and radius delineating the affected area"),
+                  T("The circular area is represented by a central point given as a coordinate pair followed by a radius value in kilometers.")))
 
-        table.note.comment = DIV(
+
+        table.geocode.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
-                  T("The text describing the purpose or significance of the alert message"),
-                  T("The message note is primarily intended for use with status 'Exercise' and message type 'Error'")))
+                  T("The geographic code delineating the affected area"),
+                  T("Any geographically-based code to describe a message target area, in the form. The key is a user-assigned string designating the domain of the code, and the content of value is a string (which may represent a number) denoting the value itself (e.g., name='ZIP' and value='54321'). This should be used in concert with an equivalent description in the more universally understood polygon and circle forms whenever possible.")))
+        table.geocode.widget = S3KeyValueWidget()
 
-        # FIXME: this should not be manually entered, needs a widget
-        table.reference.comment = DIV(
+        table.altitude.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
-                  T("The group listing identifying earlier message(s) referenced by the alert message"),
-                  T("The extended message identifier(s) (in the form sender,identifier,sent) of an earlier CAP message or messages referenced by this one.")))
-        #table.reference.widget = S3ReferenceWidget(table, one_to_many=True, allow_create=False)
+                  T("The specific or minimum altitude of the affected area"),
+                  T("If used with the ceiling element this value is the lower limit of a range. Otherwise, this value specifies a specific altitude. The altitude measure is in feet above mean sea level.")))
 
-        table.incidents.comment = DIV(
+
+        table.ceiling.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
-                  T("A list of incident(s) referenced by the alert message"),
-                  T("Used to collate multiple messages referring to different aspects of the same incident. If multie incident identifiers are referenced, they SHALL be separated by whitespace.  Incident names including whitespace SHALL be surrounded by double-quotes.")))
-        #table.addresses.widget = S3MultiSelect with the EDXL categories.
+                  T("The maximum altitude of the affected area"),
+                  T("must not be used except in combination with the 'altitude' element. The ceiling measure is in feet above mean sea level.")))
 
-        #table.info.widget = S3ReferenceWidget(current.db.cap_info, one_to_many=True, search_existing=False)
-        table.info.label = T("Alert Information")
-
-        ADD_ALERT = T("Create CAP Alert")
-        LIST_ALERTS = T("List alerts")
-        s3.crud_strings[tablename] = Storage(
-            title_create = ADD_ALERT,
-            title_display = T("CAP Alert"),
-            title_list = LIST_ALERTS,
-            title_update = T("Update CAP alert"), # this will create a new "Update" alert?
-            title_upload = T("Import CAP Alerts"),
-            title_search = T("Search CAP Alerts"),
-            subtitle_create = T("Create and Broadcast CAP Alert"),
-            subtitle_list = T("Listing of CAP Alerts created and received"),
-            label_list_button = LIST_ALERTS,
-            label_create_button = ADD_ALERT,
-            label_delete_button = T("Delete CAP Alert"),
-            msg_record_created = T("CAP alert created"),
-            msg_record_modified = T("CAP alert modified"),
-            msg_record_deleted = T("CAP alert deleted"),
-            msg_list_empty = T("No CAP alerts to show"))
+        # Area as component of Information
+        add_component("cap_info_area", cap_info="info_id")
 
         # ---------------------------------------------------------------------
         # Pass variables back to global scope (response.s3.*)
         return Storage()
 
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def alert_represent(id):
+        """
+            Represent an alert concisely
+        """
+
+        db = current.db
+        s3db = current.s3db
+        cache=s3db.cache
+
+        if not id:
+            return current.messages.NONE
+        table = s3db.cap_alert
+
+        represent = ""
+        alert_id = id
+        if alert_id:
+            query = (table.id == alert_id)
+            r = db(query).select(table.msg_type,
+                                 table.sent,
+                                 table.created_on,
+                                 table.sender,
+                                 # left = table.on(table.id == table.parent_item_category_id), Doesn't work
+                                 limitby=(0, 1),
+                                 cache=cache).first()
+
+            #XXX: Should get headline from "info"?
+            if r.msg_type:
+                sent = r.sent or r.created_on
+                return "%s - %s - %s" % (r.msg_type, sent, r.sender)
+            else:
+                return current.messages.NONE
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def list_string_represent(string, fmt=lambda v: v):
+        try:
+            if isinstance(string, list):
+                return ", ".join([fmt(i) for i in string])
+            else:
+                return ", ".join([fmt(i) for i in string[1:-1].split('|')])
+        except IndexError:
+            return current.messages.NONE
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def alert_reference_represent(v):
+        """
+            Represent an alert concisely
+        """
+
+        return S3CAPModel.list_string_represent(v, S3CAPModel.alert_represent)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def info_represent(id):
+        """
+            Represent an alert information concisely
+        """
+
+        db = current.db
+        s3db = current.s3db
+        cache=s3db.cache
+
+        if not id:
+            return current.messages.NONE
+        table = s3db.cap_info
+
+        represent = ""
+        info_id = id
+
+        query = (table.id == info_id)
+        r = db(query).select(table.headline,
+                             table.alert_id,
+                             table.language,
+                             # left = table.on(table.id == table.parent_item_category_id), Doesn't work
+                             limitby=(0, 1),
+                             cache=cache).first()
+
+        #XXX: Should get headline from "info"?
+        if r.alert_id:
+            return "%s - %s - %s" % (S3CAPModel.alert_represent(r.alert_id), r.language, r.headline)
+        else:
+            return "%s - %s" % (r.language, r.headline)
+
+# =============================================================================
+def cap_alert_rheader(r):
+    """ Resource Header for Alerts """
+
+    if r.representation == "html":
+        item = r.record
+        if item:
+
+            T = current.T
+            settings = current.deployment_settings
+
+            NONE = current.messages.NONE
+
+            tabs = [
+                    (T("Edit Details"), None),
+                    (T("Edit Information"), "info"),
+                    #(T("Edit Area"), "info_area"),
+                    #(T("Resource Files"), "info_resource"),
+                   ]
+
+            rheader_tabs = s3_rheader_tabs(r, tabs)
+
+            table = r.table
+
+            rheader = DIV(TABLE(TR( TH("%s: " % T("Alert")),
+                                    S3CAPModel.alert_represent(item.id),
+                                  )
+                               ),
+                          rheader_tabs
+                         )
+            return rheader
+    return None
+
+# =============================================================================
+def cap_info_rheader(r):
+    """ Resource Header for Alerts """
+
+    if r.representation == "html":
+        item = r.record
+        if item:
+
+            T = current.T
+            settings = current.deployment_settings
+
+            NONE = current.messages.NONE
+
+            tabs = [
+                    (T("Edit Information"), None),
+                    (T("Edit Area"), "info_area"),
+                    (T("Resource Files"), "info_resource"),
+                   ]
+
+            rheader_tabs = s3_rheader_tabs(r, tabs)
+
+            table = r.table
+
+            rheader = DIV(TABLE(TR( TH("%s: " % T("Alert Information")),
+                                    S3CAPModel.info_represent(item.id),
+                                  )
+                               ),
+                          rheader_tabs
+                         )
+            return rheader
+    return None
+
+# =============================================================================
+def cap_alert_controller():
+    """ RESTful CRUD controller """
+
+    s3db = current.s3db
+
+    return current.rest_controller("cap", "alert",
+                                   rheader=s3db.cap_alert_rheader)
+
+# =============================================================================
+def cap_info_controller():
+    """ RESTful CRUD controller """
+
+    s3db = current.s3db
+
+    return current.rest_controller("cap", "info",
+                                   rheader=s3db.cap_info_rheader)
