@@ -64,6 +64,7 @@ class S3Config(Storage):
         self.org = Storage()
         self.supply = Storage()
         self.hrm = Storage()
+        self.cap = Storage()
         self.project = Storage()
         self.save_search = Storage()
         self.parser = Storage()
@@ -662,6 +663,14 @@ class S3Config(Storage):
     # Organisation
     def get_org_site_code_len(self):
         return self.org.get("site_code_len", 10)
+
+    # -------------------------------------------------------------------------
+    # Alert
+    def get_cap_identifier_prefix(self):
+        return self.cap.get("identifier_prefix", "")
+
+    def get_cap_identifier_suffix(self):
+        return self.cap.get("identifier_suffix", "")
 
     # -------------------------------------------------------------------------
     # Human Resource Management

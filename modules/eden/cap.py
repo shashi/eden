@@ -686,20 +686,27 @@ class S3CAPModel(S3Model):
         db = current.db
         s3db = current.s3db
         cache=s3db.cache
-        domain = current.manager.domain
+        settings = current.deployment_settings
+
+        prefix = settings.get_cap_identifier_prefix() \
+                    or current.manager.domain
 
         table = s3db.cap_alert
 
         r = db().select(table.id,
                         limitby=(0, 1),
                         cache=cache).first()
-        _time = time.strftime("%Y-%m-%d.%H:%M:%S")
+        _time = time.strftime("%Y%m%dT%H:%M:%S%z")
         if r.id:
             next_id = int(r.id) + 1
         else:
             next_id = 1
 
-        return "%s.%s/%d" % (domain, _time, next_id)
+        suffix = settings.get_cap_identifier_suffix()
+
+        # format: prefix-time+-timezone+sequence-suffix
+        return "%s-%s-%d%s%s" % \
+                    (prefix, _time, next_id, ["", "-"][bool(suffix)], suffix)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -786,7 +793,6 @@ class S3CAPModel(S3Model):
         r = db(query).select(table.headline,
                              table.alert_id,
                              table.language,
-                             # left = table.on(table.id == table.parent_item_category_id), Doesn't work
                              limitby=(0, 1),
                              cache=cache).first()
 
