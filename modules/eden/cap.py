@@ -813,9 +813,10 @@ def cap_alert_rheader(r):
             NONE = current.messages.NONE
 
 
-            table = s3db.cap_alert
+            table = s3db.cap_info
+            query = table.alert_id == item.id
 
-            row = db(db.cap_info.alert_id == item.id).select(db.cap_info.id,
+            row = db(query).select(table.id,
                               limitby=(0, 1),
                               cache=cache).first()
             error = []
