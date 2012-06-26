@@ -802,11 +802,27 @@ def cap_alert_rheader(r):
     if r.representation == "html":
         item = r.record
         if item:
+            db = current.db
+            s3db = current.s3db
+            cache=s3db.cache
+            domain = current.manager.domain
 
             T = current.T
             settings = current.deployment_settings
 
             NONE = current.messages.NONE
+
+
+            table = s3db.cap_alert
+
+            row = db(db.cap_info.alert_id == item.id).select(db.cap_info.id,
+                              limitby=(0, 1),
+                              cache=cache).first()
+            error = []
+            if not (row and row.id):
+                error.append(DIV(T("You need to create atleast one alert " +
+                                   "information item in order to be able " +
+                                   "to broadcast this alert!"), _class="error"))
 
             tabs = [
                     (T("Edit Details"), None),
@@ -824,7 +840,8 @@ def cap_alert_rheader(r):
                                       _href=URL(c="cap", f="alert", args=[item.id, "update"]))
                                   )
                                ),
-                          rheader_tabs
+                          rheader_tabs,
+                          *error
                          )
             return rheader
     return None
