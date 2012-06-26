@@ -129,8 +129,7 @@ class S3CAPModel(S3Model):
 
         alert_requires = IS_NULL_OR(IS_ONE_OF(db,
                                               "cap_alert.id",
-                                              label = self.alert_represent,
-                                              sort=True))
+                                              label = self.alert_represent))
 
         alert_id = S3ReusableField("alert_id",
                                    db.cap_alert,
@@ -347,8 +346,7 @@ class S3CAPModel(S3Model):
 
         info_requires = IS_NULL_OR(IS_ONE_OF(db,
                                             "cap_info.id",
-                                            label = self.info_represent,
-                                            sort=True))
+                                            label = self.info_represent))
 
         info_id = S3ReusableField("info_id",
                                   db.cap_info,
