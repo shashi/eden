@@ -112,8 +112,12 @@ class S3CAPModel(S3Model):
                                   Field("scope",
                                         requires=IS_IN_SET(cap_alert_scope_code_opts)),
                                   Field("restriction", "text"), # text decribing the restriction for scope=restricted
-                                  Field("addresses", "list:string"),
-                                  Field("codes", "list:string"),
+                                  Field("addresses",
+                                        "list:string",
+                                        represent=self.list_string_represent),
+                                  Field("codes",
+                                        "list:string",
+                                        represent=self.list_string_represent),
                                   Field("note", "text"),
                                   Field("reference",
                                         "list:reference cap_alert",
@@ -197,6 +201,8 @@ class S3CAPModel(S3Model):
                   T("Codes for special handling of the message"),
                   T("Any user-defined flags or special codes used to flag the alert message for special handling.")))
         table.codes.widget = S3KeyValueWidget()
+        table.codes.represent = lambda v: \
+                                    self.list_string_represent(v, lambda i: ': '.join(i.split('`', 1)))
 
         table.note.comment = DIV(
               _class="tooltip",
@@ -298,11 +304,13 @@ class S3CAPModel(S3Model):
         table = self.define_table(tablename,
                                   alert_id(),
                                   Field("language"),
-                                  Field("category", "text",
+                                  Field("category",
+                                        represent=self.list_string_represent,
                                         requires=IS_IN_SET(cap_info_category_opts,
                                             multiple=True)), # 0 or more allowed
                                   Field("event", required=True),
                                   Field("response_type",
+                                        represent=self.list_string_represent,
                                         requires=IS_IN_SET(cap_info_responseType_opts,
                                             multiple=True)), # 0 or more allowed
                                   Field("urgency",
@@ -318,7 +326,9 @@ class S3CAPModel(S3Model):
                                         notnull=True,
                                         requires=IS_IN_SET(cap_info_certainty_opts)),
                                   Field("audience", "text"),
-                                  Field("event_code", "list:string"), # this is actually a map. Handled by the widget
+                                  Field("event_code",
+                                        "list:string",
+                                        represent=self.list_string_represent),
                                   Field("effective", "datetime"),
                                   Field("onset", "datetime"),
                                   Field("expires", "datetime"),
@@ -421,6 +431,8 @@ class S3CAPModel(S3Model):
                   T("A system-specific code identifying the event type of the alert message"),
                   T("Any system-specific code for events, in the form of key-value pairs. (e.g., SAME, FIPS, ZIP).")))
         table.event_code.widget = S3KeyValueWidget()
+        table.event_code.represent = lambda v: \
+                                        self.list_string_represent(v, lambda i: ': '.join(i.split('`', 1)))
 
 
         table.effective.comment = DIV(
@@ -504,6 +516,8 @@ class S3CAPModel(S3Model):
                   T("A system-specific additional parameter associated with the alert message"),
                   T("Any system-specific datum, in the form of key-value pairs.")))
         table.parameter.widget = S3KeyValueWidget()
+        table.parameter.represent = lambda v: \
+                                    self.list_string_represent(v, lambda i: ': '.join(i.split('`', 1)))
 
         #table.area.comment = DIV(
         #      _class="tooltip",
@@ -578,6 +592,26 @@ class S3CAPModel(S3Model):
 
         # Resource as component of Information
         add_component("cap_info_resource", cap_info="info_id")
+
+        ADD_INFO = T("Add alert information")
+        LIST_INFOS = T("List information entries")
+        s3.crud_strings[tablename] = Storage(
+            title_create = ADD_INFO,
+            title_display = T("Alert information"),
+            title_list = LIST_INFOS,
+            title_update = T("Update alert information"), # this will create a new "Update" alert?
+            title_upload = T("Import alert information"),
+            title_search = T("Search alert information"),
+            subtitle_create = T("Create an information entry"),
+            subtitle_list = T("Listing of alert information items"),
+            label_list_button = LIST_INFOS,
+            label_create_button = ADD_INFO,
+            label_delete_button = T("Delete CAP Alert"),
+            msg_record_created = T("CAP alert created"),
+            msg_record_modified = T("CAP alert modified"),
+            msg_record_deleted = T("CAP alert deleted"),
+            msg_list_empty = T("No CAP alerts to show"))
+
 
         # ---------------------------------------------------------------------
         tablename = "cap_info_area"
