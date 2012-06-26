@@ -95,7 +95,7 @@ class S3CAPModel(S3Model):
         cap_alert_scope_code_opts = {
             "Public": "Public - unrestricted audiences",
             "Restricted": "Restricted - to users with a known operational requirement (described in restriction)",
-            "Private": "Private - only to specified addresses (mentioned in addresses)"
+            "Private": "Private - only to specified addresses (mentioned as recipients)"
         }
 
         table = self.define_table(tablename,
