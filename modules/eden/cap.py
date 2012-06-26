@@ -721,10 +721,7 @@ class S3CAPModel(S3Model):
                              cache=cache).first()
 
         #XXX: Should get headline from "info"?
-        if r.alert_id:
-            return "%s - %s - %s" % (S3CAPModel.alert_represent(r.alert_id), r.language, r.headline)
-        else:
-            return "%s - %s" % (r.language, r.headline)
+        return "%s - %s" % (r.language, r.headline)
 
 # =============================================================================
 def cap_alert_rheader(r):
@@ -751,7 +748,8 @@ def cap_alert_rheader(r):
             table = r.table
 
             rheader = DIV(TABLE(TR( TH("%s: " % T("Alert")),
-                                    S3CAPModel.alert_represent(item.id),
+                                    A(S3CAPModel.alert_represent(item.id),
+                                      _href=URL(c="cap", f="alert", args=[item.id, "update"]))
                                   )
                                ),
                           rheader_tabs
@@ -782,8 +780,13 @@ def cap_info_rheader(r):
 
             table = r.table
 
-            rheader = DIV(TABLE(TR( TH("%s: " % T("Alert Information")),
-                                    S3CAPModel.info_represent(item.id),
+            rheader = DIV(TABLE(TR(TH("%s: " % T("Alert")),
+                                   A(S3CAPModel.alert_represent(item.alert_id),
+                                     _href=URL(c="cap", f="alert", args=[item.alert_id, "update"])),
+                                  ),
+                                TR(TH("%s: " % T("Information")),
+                                   A(S3CAPModel.info_represent(item.id),
+                                     _href=URL(c="cap", f="info", args=[item.id, "update"])),
                                   )
                                ),
                           rheader_tabs
