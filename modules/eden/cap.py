@@ -230,24 +230,24 @@ class S3CAPModel(S3Model):
 
         #table.info.widget = S3ReferenceWidget(current.db.cap_info, one_to_many=True, search_existing=False)
 
-        ADD_ALERT = T("Create CAP Alert")
-        LIST_ALERTS = T("List alerts")
+        ADD_ALERT = T("Create Alert")
+        LIST_ALERTS = T("List Alerts")
         s3.crud_strings[tablename] = Storage(
             title_create = ADD_ALERT,
-            title_display = T("CAP Alert"),
+            title_display = T("Alert"),
             title_list = LIST_ALERTS,
-            title_update = T("Update CAP alert"), # this will create a new "Update" alert?
-            title_upload = T("Import CAP Alerts"),
-            title_search = T("Search CAP Alerts"),
-            subtitle_create = T("Create and Broadcast CAP Alert"),
-            subtitle_list = T("Listing of CAP Alerts created and received"),
+            title_update = T("Update Alert"), # this will create a new "Update" alert?
+            title_upload = T("Import Alerts"),
+            title_search = T("Search Alerts"),
+            subtitle_create = T("Create and broadcast alert"),
+            subtitle_list = T("Listing of alerts created and received"),
             label_list_button = LIST_ALERTS,
             label_create_button = ADD_ALERT,
-            label_delete_button = T("Delete CAP Alert"),
-            msg_record_created = T("CAP alert created"),
-            msg_record_modified = T("CAP alert modified"),
-            msg_record_deleted = T("CAP alert deleted"),
-            msg_list_empty = T("No CAP alerts to show"))
+            label_delete_button = T("Delete Alert"),
+            msg_record_created = T("Alert created"),
+            msg_record_modified = T("Alert modified"),
+            msg_record_deleted = T("Alert deleted"),
+            msg_list_empty = T("No alerts to show"))
 
         # ---------------------------------------------------------------------
         tablename = "cap_info"
@@ -608,11 +608,11 @@ class S3CAPModel(S3Model):
             subtitle_list = T("Listing of alert information items"),
             label_list_button = LIST_INFOS,
             label_create_button = ADD_INFO,
-            label_delete_button = T("Delete CAP Alert"),
-            msg_record_created = T("CAP alert created"),
-            msg_record_modified = T("CAP alert modified"),
-            msg_record_deleted = T("CAP alert deleted"),
-            msg_list_empty = T("No CAP alerts to show"))
+            label_delete_button = T("Delete Alert"),
+            msg_record_created = T("Alert information created"),
+            msg_record_modified = T("Alert information modified"),
+            msg_record_deleted = T("Alert information deleted"),
+            msg_list_empty = T("No alert information to show"))
 
 
         # ---------------------------------------------------------------------
