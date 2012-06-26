@@ -33,6 +33,8 @@ __all__ = ["S3CAPModel",
            "cap_info_rheader",
            "cap_info_controller"]
 
+import time
+
 from gluon import *
 from gluon.storage import Storage
 from ..s3 import *
@@ -147,12 +149,14 @@ class S3CAPModel(S3Model):
               _title="%s|%s" % (
                   T("A unique identifier of the alert message"),
                   T("A number or string uniquely identifying this message, assigned by the sender. Must notnclude spaces, commas or restricted characters (< and &).")))
+        table.identifier.default = self.generate_identifier
 
         table.sender.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
                   T("The identifier of the sender of the alert message"),
                   T("This is guaranteed by assigner to be unique globally; e.g., may be based on an Internet domain name. Must not include spaces, commas or restricted characters (< and &).")))
+        table.sender.default = self.generate_sender
 
         table.status.comment = DIV(
               _class="tooltip",
@@ -673,6 +677,40 @@ class S3CAPModel(S3Model):
         # ---------------------------------------------------------------------
         # Pass variables back to global scope (response.s3.*)
         return Storage()
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def generate_identifier():
+        """
+            Generate an identifier for a new form
+        """
+
+        db = current.db
+        s3db = current.s3db
+        cache=s3db.cache
+        domain = current.manager.domain
+
+        table = s3db.cap_alert
+
+        r = db().select(table.id,
+                        limitby=(0, 1),
+                        cache=cache).first()
+        _time = time.strftime("%Y-%m-%d.%H:%M:%S")
+        if r.id:
+            next_id = int(r.id) + 1
+        else:
+            next_id = 1
+
+        return "%s.%s/%d" % (domain, _time, next_id)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def generate_sender():
+        """
+            Generate a sender for a new form
+        """
+        user_id = current.auth.user.id
+        return "%s/%d" % (current.manager.domain, user_id)
 
     # -------------------------------------------------------------------------
     @staticmethod
