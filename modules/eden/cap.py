@@ -528,6 +528,25 @@ class S3CAPModel(S3Model):
         #          T("")))
         #table.area.widget = S3ReferenceWidget(current.db.cap_info_area, one_to_many=True)
 
+        ADD_INFO = T("Add alert information")
+        LIST_INFOS = T("List information entries")
+        s3.crud_strings[tablename] = Storage(
+            title_create = ADD_INFO,
+            title_display = T("Alert information"),
+            title_list = LIST_INFOS,
+            title_update = T("Update alert information"), # this will create a new "Update" alert?
+            title_upload = T("Import alert information"),
+            title_search = T("Search alert information"),
+            subtitle_create = T("Create an information entry"),
+            subtitle_list = T("Listing of alert information items"),
+            label_list_button = LIST_INFOS,
+            label_create_button = ADD_INFO,
+            label_delete_button = T("Delete Alert"),
+            msg_record_created = T("Alert information created"),
+            msg_record_modified = T("Alert information modified"),
+            msg_record_deleted = T("Alert information deleted"),
+            msg_list_empty = T("No alert information to show"))
+
         # ---------------------------------------------------------------------
         tablename = "cap_info_resource"
         table = self.define_table(tablename,
@@ -595,26 +614,6 @@ class S3CAPModel(S3Model):
         # Resource as component of Information
         add_component("cap_info_resource", cap_info="info_id")
 
-        ADD_INFO = T("Add alert information")
-        LIST_INFOS = T("List information entries")
-        s3.crud_strings[tablename] = Storage(
-            title_create = ADD_INFO,
-            title_display = T("Alert information"),
-            title_list = LIST_INFOS,
-            title_update = T("Update alert information"), # this will create a new "Update" alert?
-            title_upload = T("Import alert information"),
-            title_search = T("Search alert information"),
-            subtitle_create = T("Create an information entry"),
-            subtitle_list = T("Listing of alert information items"),
-            label_list_button = LIST_INFOS,
-            label_create_button = ADD_INFO,
-            label_delete_button = T("Delete Alert"),
-            msg_record_created = T("Alert information created"),
-            msg_record_modified = T("Alert information modified"),
-            msg_record_deleted = T("Alert information deleted"),
-            msg_list_empty = T("No alert information to show"))
-
-
         # ---------------------------------------------------------------------
         tablename = "cap_info_area"
         # FIXME: Use gis_location here and convert wkt to WGS84
@@ -633,6 +632,7 @@ class S3CAPModel(S3Model):
               _title="%s|%s" % (
                   T("The affected area of the alert message"),
                   T("A text description of the affected area.")))
+        table.area_desc.label = T("Area description")
 
 
         table.polygon.comment = DIV(
@@ -695,7 +695,10 @@ class S3CAPModel(S3Model):
 
         r = db().select(table.id,
                         limitby=(0, 1),
-                        cache=cache).first()
+                        orderby=~table.id,
+                        #cache=cache
+                        ).first()
+
         _time = time.strftime("%Y%m%dT%H:%M:%S%z")
         if r.id:
             next_id = int(r.id) + 1
