@@ -1048,17 +1048,19 @@ def cap_alert_controller():
 
     output = current.rest_controller("cap", "alert",
                                      rheader=s3db.cap_alert_rheader)
-    form = output["form"]
 
-    tablename = form.table._tablename
+    if "form" in output:
+        form = output["form"]
 
-    if tablename == 'cap_alert':
-        add_submit_button(form, "add_info", T("Save and add information..."))
+        tablename = form.table._tablename
 
-    if tablename == 'cap_info':
-        add_submit_button(form, "add_resource", T("Save and attach a file..."), "")
-        add_submit_button(form, "add_area", T("Save and add area..."))
-        add_submit_button(form, "add_language", T("Save and add another language..."))
+        if tablename == 'cap_alert':
+            add_submit_button(form, "add_info", T("Save and add information..."))
+
+        if tablename == 'cap_info':
+            add_submit_button(form, "add_resource", T("Save and attach a file..."), "")
+            add_submit_button(form, "add_area", T("Save and add area..."))
+            add_submit_button(form, "add_language", T("Save and add another language..."))
 
     return output
 
@@ -1071,6 +1073,7 @@ def cap_info_controller():
 
     output = current.rest_controller("cap", "info",
                                    rheader=s3db.cap_info_rheader)
-    add_submit_button(output["form"], "add_language", T("Save and add another language..."))
+    if "form" in output:
+        add_submit_button(output["form"], "add_language", T("Save and add another language..."))
 
     return output
