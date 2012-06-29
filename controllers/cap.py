@@ -25,6 +25,16 @@ def cap_postp(r, output):
             r.next = URL(c="cap", f="alert", args=[r.resource.lastid, "info"])
 
     if r.tablename == "cap_info" or r.component and r.component.tablename == "cap_info":
+        if request.post_vars.get("add_language", False):
+            alert_id = None
+            if r.tablename == "cap_info":
+                alert_id = r.resource.alert_id
+            elif r.tablename == "cap_alert":
+                alert_id = r.resource.get_id()
+
+            if alert_id:
+                r.next = URL(c="cap", f="alert", args=[alert_id, "info/create"])
+
         if request.post_vars.get("add_file", False):
             r.next = URL(c="cap", f="info", args=[r.component.lastid, "info_resource"])
 

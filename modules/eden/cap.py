@@ -1033,6 +1033,13 @@ def cap_info_rheader(r):
     return None
 
 # =============================================================================
+def add_submit_button(form, name, value, style="font-weight: bold"):
+    form[0][-1][0].insert(1, TAG[""](" ",
+                INPUT(_type="submit", _name=name, _style=style,
+                      _value=value)))
+
+
+# =============================================================================
 def cap_alert_controller():
     """ RESTful CRUD controller """
 
@@ -1045,17 +1052,13 @@ def cap_alert_controller():
 
     tablename = form.table._tablename
 
-    def add_submit_button(name, value, style="font-weight: bold"):
-        form[0][-1][0].insert(1, TAG[""](" ",
-                    INPUT(_type="submit", _name=name, _style=style,
-                          _value=value)))
-
     if tablename == 'cap_alert':
-        add_submit_button("add_info", T("Save and add information..."))
+        add_submit_button(form, "add_info", T("Save and add information..."))
 
     if tablename == 'cap_info':
-        add_submit_button("add_resource", T("Save and attach a file..."), "")
-        add_submit_button("add_area", T("Save and add area..."))
+        add_submit_button(form, "add_resource", T("Save and attach a file..."), "")
+        add_submit_button(form, "add_area", T("Save and add area..."))
+        add_submit_button(form, "add_language", T("Save and add another language..."))
 
     return output
 
@@ -1064,6 +1067,10 @@ def cap_info_controller():
     """ RESTful CRUD controller """
 
     s3db = current.s3db
+    T = current.T
 
-    return current.rest_controller("cap", "info",
+    output = current.rest_controller("cap", "info",
                                    rheader=s3db.cap_info_rheader)
+    add_submit_button(output["form"], "add_language", T("Save and add another language..."))
+
+    return output
