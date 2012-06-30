@@ -63,6 +63,7 @@ class S3CAPModel(S3Model):
         message_id = self.msg_message_id
         db = current.db
         add_component = self.add_component
+        settings = current.deployment_settings
 
         tablename = "msg_report"
         table = self.define_table(tablename,
@@ -244,7 +245,7 @@ class S3CAPModel(S3Model):
                                   Field("sent",
                                         "datetime",
                                         writable=False,
-                                        readable=False),
+                                        readable=True),
                                   Field("status",
                                         requires=IS_IN_SET(cap_alert_status_code_opts)),
                                   Field("msg_type",
@@ -447,14 +448,16 @@ class S3CAPModel(S3Model):
 
         table = self.define_table(tablename,
                                   alert_id(),
-                                  Field("language"),
+                                  Field("language",
+                                        requires=IS_IN_SET(settings.get_cap_languages()),
+                                        default="en"),
                                   Field("category",
                                         represent=self.list_string_represent,
                                         requires=IS_IN_SET(cap_info_category_opts,
-                                            multiple=True)), # 0 or more allowed
+                                            multiple=True),
+                                        required=True), # 0 or more allowed
                                   Field("event", required=True),
                                   Field("response_type",
-                                        represent=self.list_string_represent,
                                         requires=IS_IN_SET(cap_info_responseType_opts,
                                             multiple=True)), # 0 or more allowed
                                   Field("urgency",
@@ -503,7 +506,7 @@ class S3CAPModel(S3Model):
               _class="tooltip",
               _title="%s|%s" % (
                   T("Denotes the language of the information"),
-                  T("Code Values: Natural language identifier per [RFC 3066]. If not present, an implicit default value of 'en-US' will be assumed.")))
+                  T("Code Values: Natural language identifier per [RFC 3066]. If not present, an implicit default value of 'en-US' will be assumed. Edit settings.cap.languages in 000_config.py to add more languages. See <a href=\"%s\">here</a> for a full list.") % "http://www.i18nguy.com/unicode/language-identifiers.html"))
 
 
         table.category.comment = DIV(

@@ -672,6 +672,25 @@ class S3Config(Storage):
     def get_cap_identifier_suffix(self):
         return self.cap.get("identifier_suffix", "")
 
+    def get_cap_languages(self):
+        """
+            Languages for cap info. This gets filled in the drop-down for
+            selecting languages. These values should conform to RFC 3066.
+
+            For a full list of languages and their codes, see:
+                http://www.i18nguy.com/unicode/language-identifiers.html 
+        """
+
+        return self.cap.get("languages",
+                             OrderedDict([
+                                ("ar", "العربية"),
+                                ("en", "English"),
+                                ("fr", "Français"),
+                                ("pt", "Português"),
+                                ("ru", "русский"),
+                                ("es", "Español")
+                            ]))
+
     # -------------------------------------------------------------------------
     # Human Resource Management
     def get_hrm_email_required(self):
