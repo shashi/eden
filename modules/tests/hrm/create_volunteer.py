@@ -1,4 +1,4 @@
-""" Sahana Eden Module Automated Tests - HRM002 Create Volunteer
+""" Sahana Eden Automated Test - HRM002 Create Volunteer
 
     @copyright: 2011-2012 (c) Sahana Software Foundation
     @license: MIT
@@ -45,21 +45,11 @@ class CreateVolunteer(SeleniumUnitTest):
         """
         print "\n"
 
-        import datetime
-        from dateutil.relativedelta import relativedelta
-
-        #@ToDo: Move these into we2unittest
-        today = datetime.date.today().strftime("%Y-%m-%d")
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        now_1_day = (datetime.datetime.now() + relativedelta( days = +1 )).strftime("%Y-%m-%d %H:%M:%S")
-        now_1_week = (datetime.date.today() + relativedelta( weeks = +1 )).strftime("%Y-%m-%d %H:%M:%S")
-        
-        browser = self.browser
-        self.login(account="normal", nexturl="vol/volunteer/create")
+        self.login(account="admin", nexturl="vol/volunteer/create")
 
         self.create("hrm_human_resource", 
                     [( "organisation_id",
-                       "Romanian Food Assistance Association (Test) (RFAAT)",
+                       "Acme Suppliers",
                        "autocomplete"),
                      ( "first_name",
                        "John",
@@ -67,33 +57,13 @@ class CreateVolunteer(SeleniumUnitTest):
                      ( "last_name",
                        "Thompson",
                        "pr_person"),
-                     ( "date_of_birth",
-                       today,
-                       "pr_person"),
-                     # To Do: Make 4th arg for this to support option
-#                     ( "gender",
-#                       "male",
-#                       "option",
-#                       "pr_person"),
                      ( "email",
-                       "test@notavalidemail.com",
+                       "test8@notavalidemail.com",
                        "pr_person"),
                      ( "job_role_id",
-                       "Child Care Worker, Part Time",
+                       "Security",
                        "option"),
-#                     ( "start_date",
-#                       today),
-#                     ( "end_date",
-#                       now_1_week),
-                     ( "L0",
-                       "Romania",
-                       "gis_location"),
-                     ( "street",
-                       "23 Petru St",
-                       "gis_location" ),
-                     ( "L3",
-                       "Bucharest",
-                       "gis_location" ),
                      ]
                      )
+
 

@@ -64,7 +64,6 @@ class S3ProcurementModel(S3Model):
         db = current.db
         s3 = current.response.s3
 
-        currency_type = s3.currency_type
         item_id = self.supply_item_entity_id
         supply_item_id = self.supply_item_id
         item_pack_id = self.supply_item_pack_id
@@ -106,13 +105,13 @@ class S3ProcurementModel(S3Model):
                                   #project_id(),
                                   Field("order_date", "date",
                                         label = T("Order Date"),
-                                        requires = IS_NULL_OR(IS_DATE(format = s3_date_format)),
+                                        requires = IS_NULL_OR(IS_DATE(format=s3_date_format)),
                                         represent = s3_date_represent,
                                         widget = S3DateWidget()
                                         ),
                                   Field("eta", "date",
                                         label = T("Date Expected"),
-                                        requires = IS_NULL_OR(IS_DATE(format = s3_date_format)),
+                                        requires = IS_NULL_OR(IS_DATE(format=s3_date_format)),
                                         represent = s3_date_represent,
                                         widget = S3DateWidget()
                                         ),
@@ -126,8 +125,8 @@ class S3ProcurementModel(S3Model):
                                         default = 0,
                                         ),
                                   # @ToDo: Add estimated shipping costs
-                                  s3.comments(),
-                                  *s3.meta_fields())
+                                  s3_comments(),
+                                  *s3_meta_fields())
 
         # CRUD strings
         s3.crud_strings[tablename] = Storage(
@@ -183,10 +182,10 @@ class S3ProcurementModel(S3Model):
                                         label = T("Quantity"),
                                         ),
                                   # @ToDo: Move this into a Currency Widget for the pack_value field
-                                  currency_type("currency",
-                                                readable=False,
-                                                writable=False
-                                            ),
+                                  s3_currency(
+                                              readable=False,
+                                              writable=False
+                                              ),
                                   Field("pack_value",
                                         "double",
                                         readable=False,
@@ -195,8 +194,8 @@ class S3ProcurementModel(S3Model):
                                   #Field("pack_quantity",
                                   #      "double",
                                   #      compute = record_pack_quantity), # defined in supply
-                                  s3.comments(),
-                                  *s3.meta_fields())
+                                  s3_comments(),
+                                  *s3_meta_fields())
 
         # CRUD strings
         s3.crud_strings[tablename] = Storage(
@@ -260,7 +259,7 @@ class S3ProcurementModel(S3Model):
                        report_hide_comments = True)
 
         # ---------------------------------------------------------------------
-        # Pass variables back to global scope (response.s3.*)
+        # Pass variables back to global scope (s3db.*)
         #
         return Storage(
             )
@@ -331,8 +330,8 @@ class S3SupplierModel(S3Model):
                                   Field("website", label = T("Website"),
                                         requires = IS_NULL_OR(IS_URL()),
                                         represent = s3_url_represent),
-                                  s3.comments(),
-                                  *(s3.address_fields() + s3.meta_fields()))
+                                  s3_comments(),
+                                  *(s3_address_fields() + s3_meta_fields()))
 
         # CRUD strings
         s3.crud_strings[tablename] = Storage(
@@ -371,7 +370,7 @@ class S3SupplierModel(S3Model):
                            proc_supplier="supplier_id")
 
         # ---------------------------------------------------------------------
-        # Pass variables back to global scope (response.s3.*)
+        # Pass variables back to global scope (s3db.*)
         #
         return Storage(
                 proc_supplier_id = supplier_id

@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
-"""
-    Custom UI Widgets
+""" Custom UI Widgets
 
     @requires: U{B{I{gluon}} <http://web2py.com>}
 
@@ -41,6 +40,7 @@ __all__ = ["S3HiddenWidget",
            "S3OrganisationAutocompleteWidget",
            "S3OrganisationHierarchyWidget",
            "S3PersonAutocompleteWidget",
+           "S3HumanResourceAutocompleteWidget",
            "S3SiteAutocompleteWidget",
            "S3TrainingAutocompleteWidget",
            "S3LocationSelectorWidget",
@@ -62,7 +62,6 @@ __all__ = ["S3HiddenWidget",
            "s3_richtext_widget",
            ]
 
-import copy
 import datetime
 
 try:
@@ -72,12 +71,23 @@ except ImportError:
     print >> sys.stderr, "ERROR: lxml module needed for XML handling"
     raise
 
-from gluon import *
-from gluon import current
-from gluon.storage import Storage
-from gluon.sqlhtml import *
+try:
+    import json # try stdlib (Python 2.6)
+except ImportError:
+    try:
+        import simplejson as json # try external module
+    except:
+        import gluon.contrib.simplejson as json # fallback to pure-Python module
 
-import gluon.contrib.simplejson as json
+from gluon import *
+# Here are dependencies listed for reference:
+#from gluon import current
+#from gluon.dal import Field
+#from gluon.html import *
+#from gluon.http import HTTP
+#from gluon.validators import *
+from gluon.sqlhtml import *
+from gluon.storage import Storage
 
 from s3utils import *
 from s3validators import *
@@ -88,7 +98,7 @@ repr_select = lambda l: len(l.name) > 48 and "%s..." % l.name[:44] or l.name
 class S3HiddenWidget(StringWidget):
 
     """
-        Standard String widget, but with a class of hidden
+        Standard String widget, but with a class of hide
 
         - currently unused
     """
@@ -100,7 +110,7 @@ class S3HiddenWidget(StringWidget):
             value = (value != None and str(value)) or "",
             )
         attr = StringWidget._attributes(field, default, **attributes)
-        attr["_class"] = "hidden %s" % attr["_class"]
+        attr["_class"] = "hide %s" % attr["_class"]
 
         return TAG[""](
                         INPUT(**attr),
@@ -109,11 +119,8 @@ class S3HiddenWidget(StringWidget):
 
 # =============================================================================
 class S3DateWidget(FormWidget):
-
     """
         Standard Date widget, but with a modified yearRange to support Birth dates
-
-        @ToDo: Fix for US-style date formats
     """
 
     def __init__(self,
@@ -122,46 +129,45 @@ class S3DateWidget(FormWidget):
                  future=1440    # how many months into the future the date can be set to
                 ):
 
-        if not format:
-            # default: "yy-mm-dd"
-            format = current.deployment_settings.get_L10n_date_format().replace("%Y", "yy").replace("%y", "y").replace("%m", "mm").replace("%d", "dd").replace("%b", "M")
         self.format = format
         self.past = past
         self.future = future
 
     def __call__(self, field, value, **attributes):
 
-        response = current.response
-
         # Need to convert value into ISO-format
         # (widget expects ISO, but value comes in custom format)
-        format=current.deployment_settings.get_L10n_date_format()
-        v, error = IS_DATE_IN_RANGE(format=format)(value)
+        _format = current.deployment_settings.get_L10n_date_format()
+        v, error = IS_DATE_IN_RANGE(format=_format)(value)
         if not error:
             value = v.isoformat()
 
+        if self.format:
+           # default: "yy-mm-dd"
+            format = str(self.format)
+        else:
+            format = _format.replace("%Y", "yy").replace("%y", "y").replace("%m", "mm").replace("%d", "dd").replace("%b", "M")
+
         default = dict(
-            _type = "text",
-            value = (value != None and str(value)) or "",
-            )
+                        _type = "text",
+                        value = (value != None and str(value)) or "",
+                    )
         attr = StringWidget._attributes(field, default, **attributes)
 
         attr["_class"] = "date"
 
         selector = str(field).replace(".", "_")
 
-        response.s3.jquery_ready.append("""
-$( '#%s' ).datepicker( 'option', 'minDate', '-%sm' );
-$( '#%s' ).datepicker( 'option', 'maxDate', '+%sm' );
-$( '#%s' ).datepicker( 'option', 'yearRange', 'c-100:c+100' );
-$( '#%s' ).datepicker( 'option', 'dateFormat', '%s' );
-""" % (selector,
-       self.past,
-       selector,
-       self.future,
-       selector,
-       selector,
-       self.format))
+        current.response.s3.jquery_ready.append(
+'''$('#%(selector)s').datepicker('option',{
+ minDate:'-%(past)sm',
+ maxDate:'+%(future)sm',
+ yearRange:'c-100:c+100',
+ dateFormat:'%(format)s'})''' % \
+        dict(selector = selector,
+             past = self.past,
+             future = self.future,
+             format = format))
 
         return TAG[""](
                         INPUT(**attr),
@@ -170,7 +176,6 @@ $( '#%s' ).datepicker( 'option', 'dateFormat', '%s' );
 
 # =============================================================================
 class S3DateTimeWidget(FormWidget):
-
     """
         Standard DateTime widget, based on the widget above, but instead of using
         jQuery datepicker we use Anytime.
@@ -182,18 +187,18 @@ class S3DateTimeWidget(FormWidget):
                  future=876000    # how many hours into the future the date can be set to
                 ):
 
-        if not format:
-            # default: "%Y-%m-%d %T"
-            format = current.deployment_settings.get_L10n_datetime_format()
         self.format = format
         self.past = past
         self.future = future
 
     def __call__(self, field, value, **attributes):
 
-        format = str(self.format)
+        if self.format:
+            # default: "%Y-%m-%d %T"
+            format = str(self.format)
+        else:
+            format = str(current.deployment_settings.get_L10n_datetime_format())
         request = current.request
-        session = current.session
         s3 = current.response.s3
 
         if isinstance(value, datetime.datetime):
@@ -212,7 +217,7 @@ class S3DateTimeWidget(FormWidget):
         selector = str(field).replace(".", "_")
 
         now = request.utcnow
-        offset = IS_UTC_OFFSET.get_offset_value(session.s3.utc_offset)
+        offset = IS_UTC_OFFSET.get_offset_value(current.session.s3.utc_offset)
         if offset:
             now = now + datetime.timedelta(seconds=offset)
         timedelta = datetime.timedelta
@@ -222,42 +227,39 @@ class S3DateTimeWidget(FormWidget):
         earliest = earliest.strftime(format)
         latest = latest.strftime(format)
 
-        s3_script_dir = "/%s/static/scripts/S3" % request.application
+        script_dir = "/%s/static/scripts" % request.application
         if s3.debug and \
-           "%s/anytime.js" % s3_script_dir not in s3.scripts:
-            s3.scripts.append( "%s/anytime.js" % s3_script_dir )
-            s3.stylesheets.append( "S3/anytime.css" )
-        elif "%s/anytimec.js" % s3_script_dir not in s3.scripts:
-            s3.scripts.append( "%s/anytimec.js" % s3_script_dir )
-            s3.stylesheets.append( "S3/anytimec.css" )
+           "%s/anytime.js" % script_dir not in s3.scripts:
+            s3.scripts.append("%s/anytime.js" % script_dir)
+            s3.stylesheets.append("plugins/anytime.css")
+        elif "%s/anytimec.js" % script_dir not in s3.scripts:
+            s3.scripts.append("%s/anytimec.js" % script_dir)
+            s3.stylesheets.append("plugins/anytimec.css")
 
-        s3.jquery_ready.append('''
-$('#{0}').AnyTime_picker({{
-    askSecond: false,
-    firstDOW: 1,
-    earliest: "{1}",
-    latest: "{2}",
-    format: "{3}",
-}});
-
-clear_button = $('<input type="button" value="clear"/>').click(function(e){{
-    $("#{0}").val("");
-}});
-
-$('#{0}').after(clear_button);'''.format(selector,
-                                         earliest,
-                                         latest,
-                                         format.replace("%M", "%i")))
+        s3.jquery_ready.append(
+'''$('#%(selector)s').AnyTime_picker({{
+ askSecond:false,
+ firstDOW:1,
+ earliest:'%(earliest)s',
+ latest:'%(latest)s',
+ format:'%(format)s',
+}})
+clear_button=$('<input type="button" value="clear"/>').click(function(e){{
+ $('#%(selector)s').val('')
+}})
+$('#%(selector)s').after(clear_button)''' % \
+        dict(selector=selector,
+             earliest=earliest,
+             latest=latest,
+             format=format.replace("%M", "%i")))
 
         return TAG[""](
                         INPUT(**attr),
                         requires = field.requires
                       )
 
-
 # =============================================================================
 class S3BooleanWidget(BooleanWidget):
-
     """
         Standard Boolean widget, with an option to hide/reveal fields conditionally.
     """
@@ -289,21 +291,21 @@ class S3BooleanWidget(BooleanWidget):
         show = ""
         for _field in fields:
             fieldname = "%s_%s" % (tablename, _field)
-            hide += """
-$( '#%s__row1' ).hide();
-$( '#%s__row' ).hide();
-""" % (fieldname, fieldname)
-            show += """
-$( '#%s__row1' ).show();
-$( '#%s__row' ).show();
-""" % (fieldname, fieldname)
+            hide += '''
+$('#%s__row1').hide()
+$('#%s__row').hide()
+''' % (fieldname, fieldname)
+            show += '''
+$('#%s__row1').show()
+$('#%s__row').show()
+''' % (fieldname, fieldname)
 
         if fields:
             checkbox = "%s_%s" % (tablename, field.name)
-            click_start = """
-$( '#%s' ).click(function() {
-    if (this.checked) {
-""" % checkbox
+            click_start = '''
+$('#%s').click(function(){
+ if(this.checked){
+''' % checkbox
             middle = "} else {\n"
             click_end = "}})"
             if click_to_show:
@@ -322,7 +324,6 @@ $( '#%s' ).click(function() {
 
 # =============================================================================
 class S3UploadWidget(UploadWidget):
-
     """
         Subclassed to not show the delete checkbox when field is mandatory
             - This now been included as standard within Web2Py from r2867
@@ -375,7 +376,6 @@ class S3UploadWidget(UploadWidget):
 
 # =============================================================================
 class S3AutocompleteWidget(FormWidget):
-
     """
         Renders a SELECT as an INPUT field with AJAX Autocomplete
     """
@@ -384,6 +384,8 @@ class S3AutocompleteWidget(FormWidget):
                  module,
                  resourcename,
                  fieldname = "name",
+                 # REST filter
+                 filter = "",
                  link_filter = "",
                  post_process = "",
                  delay = 450,     # milliseconds
@@ -392,6 +394,7 @@ class S3AutocompleteWidget(FormWidget):
         self.module = module
         self.resourcename = resourcename
         self.fieldname = fieldname
+        self.filter = filter
         self.link_filter = link_filter
         self.post_process = post_process
         self.delay = delay
@@ -402,9 +405,6 @@ class S3AutocompleteWidget(FormWidget):
 
     def __call__(self, field, value, **attributes):
 
-        request = current.request
-        response = current.response
-
         default = dict(
             _type = "text",
             value = (value != None and str(value)) or "",
@@ -412,14 +412,14 @@ class S3AutocompleteWidget(FormWidget):
         attr = StringWidget._attributes(field, default, **attributes)
 
         # Hide the real field
-        attr["_class"] = attr["_class"] + " hidden"
+        attr["_class"] = attr["_class"] + " hide"
 
         real_input = str(field).replace(".", "_")
         dummy_input = "dummy_%s" % real_input
 
         # Script defined in static/scripts/S3/S3.js
-        js_autocomplete = "S3.autocomplete('%s','%s','%s','%s','%s',\"%s\",%s,%s);\n" % \
-            (self.fieldname, self.module, self.resourcename, real_input,
+        js_autocomplete = '''S3.autocomplete('%s','%s','%s','%s','%s','%s',\"%s\",%s,%s)\n''' % \
+            (self.fieldname, self.module, self.resourcename, real_input, self.filter,
              self.link_filter, self.post_process, self.delay, self.min_length)
 
         if value:
@@ -439,16 +439,16 @@ class S3AutocompleteWidget(FormWidget):
         else:
             represent = ""
 
-        response.s3.jquery_ready.append(js_autocomplete)
+        current.response.s3.jquery_ready.append(js_autocomplete)
         return TAG[""](
                         INPUT(_id=dummy_input,
                               _class="string",
                               _value=represent),
                         IMG(_src="/%s/static/img/ajax-loader.gif" % \
-                                 request.application,
+                                 current.request.application,
                             _height=32, _width=32,
                             _id="%s_throbber" % dummy_input,
-                            _class="throbber hidden"),
+                            _class="throbber hide"),
                         INPUT(**attr),
                         requires = field.requires
                       )
@@ -456,7 +456,6 @@ class S3AutocompleteWidget(FormWidget):
 
 # =============================================================================
 class S3LocationAutocompleteWidget(FormWidget):
-
     """
         Renders a gis_location SELECT as an INPUT field with AJAX Autocomplete
 
@@ -547,7 +546,6 @@ class S3LocationAutocompleteWidget(FormWidget):
 
 # =============================================================================
 class S3OrganisationAutocompleteWidget(FormWidget):
-
     """
         Renders an org_organisation SELECT as an INPUT field with AJAX Autocomplete.
         Differs from the S3AutocompleteWidget in that it can default to the setting in the profile.
@@ -591,7 +589,6 @@ class S3OrganisationAutocompleteWidget(FormWidget):
             )
         )
 
-
 # =============================================================================
 class S3OrganisationHierarchyWidget(OptionsWidget):
     """ Renders an organisation_id SELECT as a menu """
@@ -606,8 +603,6 @@ class S3OrganisationHierarchyWidget(OptionsWidget):
 
     def __call__(self, field, value, **attributes):
 
-        s3 = current.response.s3
-        table = current.s3db.org_organisation
         options = self.primary_options
         name = attributes.get("_name", field.name)
 
@@ -620,6 +615,7 @@ class S3OrganisationHierarchyWidget(OptionsWidget):
                 if isinstance(requires, IS_EMPTY_OR):
                     requires = requires.other
                 if hasattr(requires, "options"):
+                    table = current.s3db.org_organisation
                     options = requires.options()
                     ids = [option[0] for option in options if option[0]]
                     rows = current.db(table.id.belongs(ids)).select(table.id,
@@ -632,17 +628,18 @@ class S3OrganisationHierarchyWidget(OptionsWidget):
                 else:
                     raise SyntaxError, "widget cannot determine options of %s" % field
 
-        javascript_array = "%s_options = %s;" % (name,
-                                                 json.dumps(options))
+        javascript_array = '''%s_options=%s''' % (name,
+                                                  json.dumps(options))
+        s3 = current.response.s3
         s3.js_global.append(javascript_array)
-        s3.scripts.append("%s/%s" % (s3.script_dir, "s3.orghierarchy.js"))
-        s3.stylesheets.append("S3/jquery.ui.menu.css")
+        s3.scripts.append("/%s/static/scripts/S3/s3.orghierarchy.js" % \
+            current.request.application)
+        s3.stylesheets.append("jquery-ui/jquery.ui.menu.css")
 
         return self.widget(field, value, **attributes)
 
 # =============================================================================
 class S3PersonAutocompleteWidget(FormWidget):
-
     """
         Renders a pr_person SELECT as an INPUT field with AJAX Autocomplete.
         Differs from the S3AutocompleteWidget in that it uses 3 name fields
@@ -667,6 +664,144 @@ class S3PersonAutocompleteWidget(FormWidget):
 
     def __call__(self, field, value, **attributes):
 
+        default = dict(
+            _type = "text",
+            value = (value != None and str(value)) or "",
+            )
+        attr = StringWidget._attributes(field, default, **attributes)
+
+        # Hide the real field
+        attr["_class"] = "%s hide" % attr["_class"]
+
+        real_input = str(field).replace(".", "_")
+        dummy_input = "dummy_%s" % real_input
+        url = URL(c=self.c,
+                  f=self.f,
+                  args="search.json")
+
+        js_autocomplete = "".join((
+'''var %(real_input)s={val:$('#%(dummy_input)s').val(),accept:false}
+$('#%(dummy_input)s').autocomplete({
+ source:'%(url)s',
+ delay:%(delay)d,
+ minLength:%(min_length)d,
+ search:function(event,ui){
+  $('#%(dummy_input)s_throbber').removeClass('hide').show()
+  return true
+ },
+ response:function(event,ui,content){
+  $('#%(dummy_input)s_throbber').hide()
+  return content
+ },
+ focus:function(event,ui){
+  var name=ui.item.first
+  if(ui.item.middle){
+   name+=' '+ui.item.middle
+  }
+  if(ui.item.last){
+   name+=' '+ui.item.last
+  }
+  $('#%(dummy_input)s').val(name)
+  return false
+ },
+ select:function(event,ui){
+  var name=ui.item.first
+  if(ui.item.middle){
+   name+=' '+ui.item.middle
+  }
+  if(ui.item.last){
+   name+=' '+ui.item.last
+  }
+  $('#%(dummy_input)s').val(name)
+  $('#%(real_input)s').val(ui.item.id).change()
+''' % dict(dummy_input = dummy_input,
+           url = url,
+           delay = self.delay,
+           min_length = self.min_length,
+           real_input = real_input),
+        self.post_process, '''
+  %(real_input)s.accept=true
+  return false
+ }
+}).data('autocomplete')._renderItem=function(ul,item){
+ var name=item.first
+ if(item.middle){
+  name+=' '+item.middle
+ }
+ if(item.last){
+  name+=' '+item.last
+ }
+ return $('<li></li>').data('item.autocomplete',item).append('<a>'+name+'</a>').appendTo(ul)
+}
+$('#%(dummy_input)s').blur(function(){
+ if(!$('#%(dummy_input)s').val()){
+  $('#%(real_input)s').val('').change()
+  %(real_input)s.accept=true
+ }
+ if(!%(real_input)s.accept){
+  $('#%(dummy_input)s').val(%(real_input)s.val)
+ }else{
+  %(real_input)s.val=$('#%(dummy_input)s').val()
+ }
+ %(real_input)s.accept=false
+})''' % dict(dummy_input = dummy_input,
+              real_input = real_input)))
+
+        if value:
+            # Provide the representation for the current/default Value
+            text = str(field.represent(default["value"]))
+            if "<" in text:
+                # Strip Markup
+                try:
+                    markup = etree.XML(text)
+                    text = markup.xpath(".//text()")
+                    if text:
+                        text = " ".join(text)
+                    else:
+                        text = ""
+                except etree.XMLSyntaxError:
+                    pass
+            represent = text
+        else:
+            represent = ""
+
+        current.response.s3.jquery_ready.append(js_autocomplete)
+        return TAG[""](
+                        INPUT(_id=dummy_input,
+                              _class="string",
+                              _value=represent),
+                        IMG(_src="/%s/static/img/ajax-loader.gif" % \
+                                 current.request.application,
+                            _height=32, _width=32,
+                            _id="%s_throbber" % dummy_input,
+                            _class="throbber hide"),
+                        INPUT(**attr),
+                        requires = field.requires
+                      )
+
+# =============================================================================
+class S3HumanResourceAutocompleteWidget(FormWidget):
+    """
+        Renders an hrm_human_resource SELECT as an INPUT field with
+        AJAX Autocomplete.
+
+        Differs from the S3AutocompleteWidget in that it uses:
+            3 name fields
+            Organisation
+            Job Role
+   """
+
+    def __init__(self,
+                 post_process = "",
+                 delay = 450,   # milliseconds
+                 min_length=2): # Increase this for large deployments
+
+        self.post_process = post_process
+        self.delay = delay
+        self.min_length = min_length
+
+    def __call__(self, field, value, **attributes):
+
         request = current.request
         response = current.response
 
@@ -677,100 +812,121 @@ class S3PersonAutocompleteWidget(FormWidget):
         attr = StringWidget._attributes(field, default, **attributes)
 
         # Hide the real field
-        attr["_class"] = "%s hidden" % attr["_class"]
+        attr["_class"] = "%s hide" % attr["_class"]
 
         real_input = str(field).replace(".", "_")
         dummy_input = "dummy_%s" % real_input
-        url = URL(c=self.c,
-                  f=self.f,
-                  args="search.json",
-                  vars={"filter":"~"})
+        url = URL(c="hrm",
+                  # This searches HRMs using S3HRSearch
+                  f="person_search",
+                  args="search.json")
 
-        js_autocomplete = "".join(("""
-var data = { val:$('#%s').val(), accept:false };
-$('#%s').autocomplete({
-    source: '%s',
-    delay: %d,
-    minLength: %d,
-    search: function(event, ui) {
-        $( '#%s_throbber' ).removeClass('hidden').show();
-        return true;
-    },
-    response: function(event, ui, content) {
-        $( '#%s_throbber' ).hide();
-        return content;
-    },
-    focus: function( event, ui ) {
-        var name = '';
-        if (ui.item.first_name != null) {
-            name += ui.item.first_name;
-        }
-        if (ui.item.middle_name != null) {
-            name += ' ' + ui.item.middle_name;
-        }
-        if (ui.item.last_name != null) {
-            name += ' ' + ui.item.last_name;
-        }
-        $( '#%s' ).val( name );
-        return false;
-    },
-    select: function( event, ui ) {
-        var name = '';
-        if (ui.item.first_name != null) {
-            name += ui.item.first_name;
-        }
-        if (ui.item.middle_name != null) {
-            name += ' ' + ui.item.middle_name;
-        }
-        if (ui.item.last_name != null) {
-            name += ' ' + ui.item.last_name;
-        }
-        $( '#%s' ).val( name );
-        $( '#%s' ).val( ui.item.id )
-                  .change();
-        """ % (dummy_input,
-               dummy_input,
-               url,
-               self.delay,
-               self.min_length,
-               dummy_input,
-               dummy_input,
-               dummy_input,
-               dummy_input,
-               real_input), self.post_process, """
-        data.accept = true;
-        return false;
+        js_autocomplete = "".join((
+'''var %(real_input)s={val:$('#%(dummy_input)s').val(),accept:false}
+$('#%(dummy_input)s').autocomplete({
+ source:'%(url)s',
+ delay:%(delay)d,
+ minLength:%(min_length)d,
+ search:function(event,ui){
+  $('#%(dummy_input)s_throbber').removeClass('hide').show()
+  return true
+ },
+ response:function(event,ui,content){
+  $('#%(dummy_input)s_throbber').hide()
+  return content
+ },
+ focus:function(event,ui){
+  var name=ui.item.first
+  if(ui.item.middle){
+   name+=' '+ui.item.middle
+  }
+  if(ui.item.last){
+   name+=' '+ui.item.last
+  }
+  var org=ui.item.org
+  var job=ui.item.job
+  if(org||job){
+   if(job){
+    name+=' ('+job
+    if(org){
+     name+=', '+org
     }
-})
-.data( 'autocomplete' )._renderItem = function( ul, item ) {
-    var name = '';
-    if (item.first_name != null) {
-        name += item.first_name;
+    name+=')'
+   }else{
+    name+=' ('+org+')'
+   }
+  }
+  $('#%(dummy_input)s').val(name)
+  return false
+ },
+ select:function(event,ui){
+  var name=ui.item.first
+  if(ui.item.middle){
+   name+=' '+ui.item.middle
+  }
+  if(ui.item.last){
+   name+=' '+ui.item.last
+  }
+  var org=ui.item.org
+  var job=ui.item.job
+  if(org||job){
+   if(job){
+    name+=' ('+job
+    if(org){
+     name+=', '+org
     }
-    if (item.middle_name != null) {
-        name += ' ' + item.middle_name;
-    }
-    if (item.last_name != null) {
-        name += ' ' + item.last_name;
-    }
-    return $( '<li></li>' )
-        .data( 'item.autocomplete', item )
-        .append( '<a>' + name + '</a>' )
-        .appendTo( ul );
-};
-$('#%s').blur(function() {
-    if (!$('#%s').val()) {
-        $('#%s').val('')
-                .change();
-        data.accept = true;
-    }
-    if (!data.accept) {
-        $('#%s').val(data.val);
-    } else {
-        data.val = $('#%s').val();
-    }
-    data.accept = false;
-});""" % (dummy_input, dummy_input, real_input, dummy_input, dummy_input)))
+    name+=')'
+   }else{
+    name+=' ('+org+')'
+   }
+  }
+  $('#%(dummy_input)s').val(name)
+  $('#%(real_input)s').val(ui.item.id).change()
+''' % dict(dummy_input = dummy_input,
+           url = url,
+           delay = self.delay,
+           min_length = self.min_length,
+           real_input = real_input),
+        self.post_process, '''
+  %(real_input)s.accept=true
+  return false
+ }
+}).data('autocomplete')._renderItem=function(ul,item){
+ var name=item.first
+ if(item.middle){
+  name+=' '+item.middle
+ }
+ if(item.last){
+  name+=' '+item.last
+ }
+ var org=item.org
+ var job=item.job
+ if(org||job){
+  if(job){
+   name+=' ('+job
+   if(org){
+    name+=', '+org
+   }
+   name+=')'
+  }else{
+   name+=' ('+org+')'
+  }
+ }
+ return $('<li></li>').data('item.autocomplete',item).append('<a>'+name+'</a>').appendTo(ul)
+}
+$('#%(dummy_input)s').blur(function(){
+ if(!$('#%(dummy_input)s').val()){
+  $('#%(real_input)s').val('').change()
+  %(real_input)s.accept=true
+ }
+ if(!%(real_input)s.accept){
+  $('#%(dummy_input)s').val(%(real_input)s.val)
+ }else{
+  %(real_input)s.val=$('#%(dummy_input)s').val()
+ }
+ %(real_input)s.accept=false
+})''' % dict(dummy_input = dummy_input,
+              real_input = real_input)))
 
         if value:
             # Provide the representation for the current/default Value
@@ -799,14 +955,13 @@ $('#%s').blur(function() {
                                  request.application,
                             _height=32, _width=32,
                             _id="%s_throbber" % dummy_input,
-                            _class="throbber hidden"),
+                            _class="throbber hide"),
                         INPUT(**attr),
                         requires = field.requires
                       )
 
 # =============================================================================
 class S3SiteAutocompleteWidget(FormWidget):
-
     """
         Renders an org_site SELECT as an INPUT field with AJAX Autocomplete.
         Differs from the S3AutocompleteWidget in that it uses name & type fields
@@ -825,10 +980,6 @@ class S3SiteAutocompleteWidget(FormWidget):
 
     def __call__(self, field, value, **attributes):
 
-        request = current.request
-        response = current.response
-        auth = self.auth
-
         default = dict(
             _type = "text",
             value = (value != None and str(value)) or "",
@@ -836,7 +987,7 @@ class S3SiteAutocompleteWidget(FormWidget):
         attr = StringWidget._attributes(field, default, **attributes)
 
         # Hide the real field
-        attr["_class"] = "%s hidden" % attr["_class"]
+        attr["_class"] = "%s hide" % attr["_class"]
 
         real_input = str(field).replace(".", "_")
         dummy_input = "dummy_%s" % real_input
@@ -848,95 +999,84 @@ class S3SiteAutocompleteWidget(FormWidget):
         # Provide a Lookup Table for Site Types
         cases = ""
         case = -1
-        for instance_type in auth.org_site_types.keys():
+        org_site_types = current.auth.org_site_types
+        for instance_type in org_site_types.keys():
             case = case + 1
-            cases += """
-                    case '%s':
-                        return '%s';
-            """ % (instance_type,
-                   auth.org_site_types[instance_type])
+            cases += '''case '%s':
+   return '%s'
+  ''' % (instance_type,
+         org_site_types[instance_type])
 
-        js_autocomplete = "".join(("""
-function s3_site_lookup(instance_type) {
-    switch (instance_type) {
-        %s
-    }
-}""" % cases, """
-var data = { val:$('#%s').val(), accept:false };
-$('#%s').autocomplete({
-    source: '%s',
-    delay: %d,
-    minLength: %d,
-    search: function(event, ui) {
-        $( '#%s_throbber' ).removeClass('hidden').show();
-        return true;
-    },
-    response: function(event, ui, content) {
-        $( '#%s_throbber' ).hide();
-        return content;
-    },
-    focus: function( event, ui ) {
-        var name = '';
-        if (ui.item.name != null) {
-            name += ui.item.name;
-        }
-        if (ui.item.instance_type != '') {
-            name += ' (' + s3_site_lookup(ui.item.instance_type) + ')';
-        }
-        $( '#%s' ).val( name );
-        return false;
-    },
-    select: function( event, ui ) {
-        var name = '';
-        if (ui.item.name != null) {
-            name += ui.item.name;
-        }
-        if (ui.item.instance_type != '') {
-            name += ' (' + s3_site_lookup(ui.item.instance_type) + ')';
-        }
-        $( '#%s' ).val( name );
-        $( '#%s' ).val( ui.item.site_id )
-                  .change();
-        """ % (dummy_input,
-               dummy_input,
-               url,
-               self.delay,
-               self.min_length,
-               dummy_input,
-               dummy_input,
-               dummy_input,
-               dummy_input,
-               real_input), self.post_process, """
-        data.accept = true;
-        return false;
-    }
-})
-.data( 'autocomplete' )._renderItem = function( ul, item ) {
-    var name = '';
-    if (item.name != null) {
-        name += item.name;
-    }
-    if (item.instance_type != '') {
-        name += ' (' + s3_site_lookup(item.instance_type) + ')';
-    }
-    return $( '<li></li>' )
-        .data( 'item.autocomplete', item )
-        .append( '<a>' + name + '</a>' )
-        .appendTo( ul );
-};
-$('#%s').blur(function() {
-    if (!$('#%s').val()) {
-        $('#%s').val('')
-                .change();
-        data.accept = true;
-    }
-    if (!data.accept) {
-        $('#%s').val(data.val);
-    } else {
-        data.val = $('#%s').val();
-    }
-    data.accept = false;
-});""" % (dummy_input, dummy_input, real_input, dummy_input, dummy_input)))
+        js_autocomplete = "".join(('''function s3_site_lookup(instance_type){
+ switch(instance_type){
+  %s}
+}''' % cases, '''
+var %(real_input)s={val:$('#%(dummy_input)s').val(),accept:false}
+$('#%(dummy_input)s').autocomplete({
+ source:'%(url)s',
+ delay:%(delay)d,
+ minLength:%(min_length)d,
+ search:function(event,ui){
+  $('#%(dummy_input)s_throbber').removeClass('hide').show()
+  return true
+ },
+ response:function(event,ui,content){
+  $('#%(dummy_input)s_throbber').hide()
+  return content
+ },
+ focus:function(event,ui){
+  var name=''
+  if(ui.item.name!=null){
+   name+=ui.item.name
+  }
+  if(ui.item.instance_type!=''){
+   name+=' ('+s3_site_lookup(ui.item.instance_type)+')'
+  }
+  $('#%(dummy_input)s').val(name)
+   return false
+  },
+  select:function(event,ui){
+   var name=''
+   if(ui.item.name!=null){
+    name+=ui.item.name
+   }
+   if(ui.item.instance_type!=''){
+    name+=' ('+s3_site_lookup(ui.item.instance_type)+')'
+   }
+   $('#%(dummy_input)s').val(name)
+   $('#%(real_input)s').val(ui.item.site_id).change()
+''' % dict(dummy_input=dummy_input,
+           real_input=real_input,
+           url=url,
+           delay=self.delay,
+           min_length=self.min_length),
+        self.post_process, '''
+   %(real_input)s.accept=true
+   return false
+  }
+}).data('autocomplete')._renderItem=function(ul,item){
+ var name=''
+ if(item.name!=null){
+  name+=item.name
+ }
+ if(item.instance_type!=''){
+  name+=' ('+s3_site_lookup(item.instance_type)+')'
+ }
+ return $('<li></li>').data('item.autocomplete',item).append('<a>'+name+'</a>').appendTo(ul)
+}
+$('#%(dummy_input)s').blur(function(){
+ if(!$('#%(dummy_input)s').val()){
+  $('#%(real_input)s').val('').change()
+  %(real_input)s.accept=true
+ }
+ if(!%(real_input)s.accept){
+  $('#%(dummy_input)s').val(%(real_input)s.val)
+ }else{
+  %(real_input)s.val=$('#%(dummy_input)s').val()
+ }
+ %(real_input)s.accept=false
+})''' % dict(dummy_input=dummy_input,
+             real_input=real_input)))
 
         if value:
             # Provide the representation for the current/default Value
@@ -956,23 +1096,22 @@ $('#%s').blur(function() {
         else:
             represent = ""
 
-        response.s3.jquery_ready.append(js_autocomplete)
+        current.response.s3.jquery_ready.append(js_autocomplete)
         return TAG[""](
                         INPUT(_id=dummy_input,
                               _class="string",
                               _value=represent),
                         IMG(_src="/%s/static/img/ajax-loader.gif" % \
-                                 request.application,
+                                 current.request.application,
                             _height=32, _width=32,
                             _id="%s_throbber" % dummy_input,
-                            _class="throbber hidden"),
+                            _class="throbber hide"),
                         INPUT(**attr),
                         requires = field.requires
                       )
 
 # =============================================================================
 class S3TrainingAutocompleteWidget(FormWidget):
-
     """
         Renders an hrm_training_event SELECT as an INPUT field with AJAX Autocomplete.
         Differs from the S3AutocompleteWidget in that it uses course, site and date fields
@@ -1001,41 +1140,38 @@ class S3TrainingAutocompleteWidget(FormWidget):
             attributes,
             source = repr(
                 URL(c="hrm", f="training_event",
-                    args="search.json",
-                    vars={"filter":"~"})
+                    args="search.json")
             ),
-            name_getter = """function (item) {
-    var name = '';
-    if (item.course != null) {
-        name += item.course;
-    }
-    if (item.site != '') {
-        name += ' (' + item.site + ')';
-    }
-    if (item.date != '') {
-        name += ' [' + item.date + ']';
-    }
-    return name;
-}""",
+            name_getter = '''function(item){
+ var name=''
+ if(item.course!=null){
+  name+=item.course
+ }
+ if(item.site!=''){
+  name+=' ('+item.site+')'
+ }
+ if(item.date!=''){
+  name+=' ['+item.date+']'
+ }
+ return name
+}''',
         )
 
 # -----------------------------------------------------------------------------
-def S3GenericAutocompleteTemplate(
-    post_process,
-    delay,
-    min_length,
-    field,
-    value,
-    attributes,
-    source,
-    name_getter = "function(item) {return item.name}",
-    id_getter = "function(item) {return item.id}",
-    transform_value = lambda value: value,
-):
+def S3GenericAutocompleteTemplate(post_process,
+                                  delay,
+                                  min_length,
+                                  field,
+                                  value,
+                                  attributes,
+                                  source,
+                                  name_getter = "function(item){return item.name}",
+                                  id_getter = "function(item){return item.id}",
+                                  transform_value = lambda value: value,
+                                  ):
     """
         Renders a SELECT as an INPUT field with AJAX Autocomplete
     """
-    request = current.request
 
     value = transform_value(value)
 
@@ -1046,60 +1182,55 @@ def S3GenericAutocompleteTemplate(
     attr = StringWidget._attributes(field, default, **attributes)
 
     # Hide the real field
-    attr["_class"] = attr["_class"] + " hidden"
+    attr["_class"] = attr["_class"] + " hide"
 
     real_input = str(field).replace(".", "_")
     dummy_input = "dummy_%s" % real_input
-
-    js_autocomplete = "".join(("""
-var data = { val:$('#%(dummy_input)s').val(), accept:false };
-var get_name = %(name_getter)s;
-var get_id = %(id_getter)s;
+    js_autocomplete = "".join(('''
+var %(real_input)s={val:$('#%(dummy_input)s').val(),accept:false}
+var get_name=%(name_getter)s
+var get_id=%(id_getter)s
 $('#%(dummy_input)s').autocomplete({
-    source: %(source)s,
-    delay: %(delay)d,
-    minLength: %(min_length)d,
-    search: function(event, ui) {
-        $('#%(dummy_input)s_throbber').removeClass('hidden').show();
-        return true;
-    },
-    response: function(event, ui, content) {
-        $('#%(dummy_input)s_throbber').hide();
-        return content;
-    },
-    focus: function(event, ui) {
-        $('#%(dummy_input)s').val(get_name(ui.item));
-        return false;
-    },
-    select: function( event, ui ) {
-        var item = ui.item
-        $('#%(dummy_input)s').val(get_name(ui.item));
-        $('#%(real_input)s').val(get_id(ui.item)).change();
-        """ % locals(),
-        post_process or "",
-        """
-        data.accept = true;
-        return false;
-    }
-})
-.data('autocomplete')._renderItem = function(ul, item) {
-    return $('<li></li>')
-        .data('item.autocomplete', item)
-        .append('<a>' + get_name(item) + '</a>')
-        .appendTo(ul);
-};
-$('#%(dummy_input)s').blur(function() {
-    if (!$('#%(dummy_input)s').val()) {
-        $('#%(real_input)s').val('').change();
-        data.accept = true;
-    }
-    if (!data.accept) {
-        $('#%(dummy_input)s').val(data.val);
-    } else {
-        data.val = $('#%(dummy_input)s').val();
-    }
-    data.accept = false;
-});""" % locals()))
+ source:%(source)s,
+ delay:%(delay)d,
+ minLength:%(min_length)d,
+ search:function(event,ui){
+  $('#%(dummy_input)s_throbber').removeClass('hide').show()
+  return true
+ },
+ response:function(event,ui,content){
+  $('#%(dummy_input)s_throbber').hide()
+  return content
+ },
+ focus:function(event,ui){
+  $('#%(dummy_input)s').val(get_name(ui.item))
+  return false
+ },
+ select:function(event,ui){
+  var item=ui.item
+  $('#%(dummy_input)s').val(get_name(ui.item))
+  $('#%(real_input)s').val(get_id(ui.item)).change()
+  ''' % locals(),
+    post_process or "",
+  '''
+  %(real_input)s.accept=true
+  return false
+ }
+}).data('autocomplete')._renderItem=function(ul,item){
+ return $('<li></li>').data('item.autocomplete',item).append('<a>'+get_name(item)+'</a>').appendTo(ul)
+}
+$('#%(dummy_input)s').blur(function(){
+ if(!$('#%(dummy_input)s').val()){
+  $('#%(real_input)s').val('').change()
+  %(real_input)s.accept=true
+ }
+ if(!%(real_input)s.accept){
+  $('#%(dummy_input)s').val(%(real_input)s.val)
+ }else{
+  %(real_input)s.val=$('#%(dummy_input)s').val()
+ }
+ %(real_input)s.accept=false
+})''' % locals()))
 
     if value:
         # Provide the representation for the current/default Value
@@ -1125,10 +1256,10 @@ $('#%(dummy_input)s').blur(function() {
                           _class="string",
                           _value=represent),
                     IMG(_src="/%s/static/img/ajax-loader.gif" % \
-                             request.application,
+                             current.request.application,
                         _height=32, _width=32,
                         _id="%s_throbber" % dummy_input,
-                        _class="throbber hidden"),
+                        _class="throbber hide"),
                     INPUT(**attr),
                     requires = field.requires
                   )
@@ -1153,15 +1284,12 @@ class S3LocationDropdownWidget(FormWidget):
         default = self.default
         empty = self.empty
 
-        db = current.db
         s3db = current.s3db
-        cache = current.response.s3.cache
         table = s3db.gis_location
-
         query = (table.level == level)
-        locations = db(query).select(table.name,
-                                     table.id,
-                                     cache = cache)
+        locations = current.db(query).select(table.name,
+                                             table.id,
+                                             cache=s3db.cache)
         opts = []
         for location in locations:
             opts.append(OPTION(location.name, _value=location.id))
@@ -1186,7 +1314,6 @@ class S3LocationDropdownWidget(FormWidget):
 
 # =============================================================================
 class S3LocationSelectorWidget(FormWidget):
-
     """
         Renders a gis_location Foreign Key to allow inline display/editing of linked fields.
 
@@ -1251,11 +1378,9 @@ class S3LocationSelectorWidget(FormWidget):
 
         auth = current.auth
         settings = current.deployment_settings
-        request = current.request
         response = current.response
         s3 = current.response.s3
-        manager = current.manager
-        cache = s3.cache
+        appname = current.request.application
 
         locations = s3db.gis_location
         ctable = s3db.gis_config
@@ -1267,7 +1392,7 @@ class S3LocationSelectorWidget(FormWidget):
                         value = (value != None and str(value)) or "")
         attr = StringWidget._attributes(field, defaults, **attributes)
         # Hide the real field
-        attr["_class"] = "hidden"
+        attr["_class"] = "hide"
 
         # Is this a Site?
         site = ""
@@ -1298,8 +1423,21 @@ class S3LocationSelectorWidget(FormWidget):
             if tablename in auth.org_site_types:
                 site = tablename
 
-        # Full list of countries
+        # Full list of countries (by ID)
         countries = gis.get_countries()
+
+        # Countries we should select from
+        _countries = settings.get_gis_countries()
+        if _countries:
+            __countries = gis.get_countries(key_type="code")
+            countrynames = []
+            append = countrynames.append
+            for k, v in __countries.iteritems():
+                if k in _countries:
+                    append(v)
+            for k, v in countries.iteritems():
+                if v not in countrynames:
+                    del countries[k]
 
         # Read Options
         config = gis.get_config()
@@ -1343,16 +1481,16 @@ class S3LocationSelectorWidget(FormWidget):
         latlon_selector = settings.get_gis_latlon_selector()
         # Navigate Away Confirm?
         if settings.get_ui_navigate_away_confirm():
-            navigate_away_confirm = """
-S3.navigate_away_confirm = true;"""
+            navigate_away_confirm = '''
+S3.navigate_away_confirm=true'''
         else:
             navigate_away_confirm = ""
 
         # Which tab should the widget open to by default?
         # @ToDo: Act on this server-side instead of client-side
-        if response.s3.gis.tab:
-            tab = """
-S3.gis.tab = '%s';""" % response.s3.gis.tab
+        if s3.gis.tab:
+            tab = '''
+S3.gis.tab="%s"''' % s3.gis.tab
         else:
             # Default to Create
             tab = ""
@@ -1373,7 +1511,7 @@ S3.gis.tab = '%s';""" % response.s3.gis.tab
             if auth.s3_has_permission("update", locations, record_id=value):
                 # Update mode
                 # - we assume this location could be shared by other resources
-                create = "hidden"   # Hide sections which are meant for create forms
+                create = "hide"   # Hide sections which are meant for create forms
                 update = ""
                 query = (locations.id == value)
                 this_location = db(query).select(locations.uuid,
@@ -1479,7 +1617,7 @@ S3.gis.tab = '%s';""" % response.s3.gis.tab
             if auth.s3_has_permission("update", locations):
                 # Create mode
                 create = ""
-                update = "hidden"   # Hide sections which are meant for update forms
+                update = "hide"   # Hide sections which are meant for update forms
                 uuid = ""
                 represent = ""
                 level = None
@@ -1489,8 +1627,6 @@ S3.gis.tab = '%s';""" % response.s3.gis.tab
                 #addr_street_encoded = ""
                 postcode = ""
                 if map_selector:
-                    # Load the Models
-                    manager.load("gis_layer_openstreetmap")
                     map_popup = gis.show_map(
                                              add_feature = True,
                                              add_feature_active = True,
@@ -1550,7 +1686,7 @@ S3.gis.tab = '%s';""" % response.s3.gis.tab
                       _class="locselect box_middle")
 
         # L0 selector
-        SELECT_LOCATION = T("Select a location")
+        SELECT_COUNTRY = T("Choose country")
         level = "L0"
         L0_rows = ""
         if len(countries) == 1:
@@ -1559,7 +1695,7 @@ S3.gis.tab = '%s';""" % response.s3.gis.tab
             L0_rows = INPUT(value = id,
                             _id="gis_location_%s" % level,
                             _name="gis_location_%s" % level,
-                            _class="hidden box_middle")
+                            _class="hide box_middle")
         else:
             if default_L0:
                 attr_dropdown = OptionsWidget._attributes(field,
@@ -1573,10 +1709,10 @@ S3.gis.tab = '%s';""" % response.s3.gis.tab
                                                           **attributes)
             attr_dropdown["requires"] = \
                 IS_NULL_OR(IS_IN_SET(countries,
-                                     zero = SELECT_LOCATION))
+                                     zero = SELECT_COUNTRY))
             attr_dropdown["represent"] = \
                 lambda id: gis.get_country(id) or UNKNOWN_OPT
-            opts = [OPTION(SELECT_LOCATION, _value="")]
+            opts = [OPTION(SELECT_COUNTRY, _value="")]
             if countries:
                 for (id, name) in countries.iteritems():
                     opts.append(OPTION(name, _value=id))
@@ -1601,7 +1737,7 @@ S3.gis.tab = '%s';""" % response.s3.gis.tab
                              _id="gis_location_%s__row" % level))
         row = TR(INPUT(_id="gis_location_%s_search" % level,
                        _disabled="disabled"), TD(),
-                 _class="hidden locselect box_middle",
+                 _class="hide locselect box_middle",
                  _id="gis_location_%s_search__row" % level)
         L0_rows.append(row)
 
@@ -1624,7 +1760,7 @@ S3.gis.tab = '%s';""" % response.s3.gis.tab
                         _title="%s|%s|%s" % (label, AUTOCOMPLETE_HELP, NEW_HELP))
 
         hidden = ""
-        throbber = "/%s/static/img/ajax-loader.gif" % request.application
+        throbber = "/%s/static/img/ajax-loader.gif" % appname
         Lx_rows = DIV()
         if value:
             # Display Read-only Fields
@@ -1659,7 +1795,7 @@ S3.gis.tab = '%s';""" % response.s3.gis.tab
                     name = defaults[level].name
                 else:
                     # Hide empty levels
-                    hidden = "hidden"
+                    hidden = "hide"
                     id = ""
                     name = ""
                 try:
@@ -1673,14 +1809,14 @@ S3.gis.tab = '%s';""" % response.s3.gis.tab
                 widget = DIV(INPUT(value=id,
                                    _id="gis_location_%s" % level,
                                    _name="gis_location_%s" % level,
-                                   _class="hidden"),
+                                   _class="hide"),
                              INPUT(value=name,
                                    _id="gis_location_%s_ac" % level,
                                    _disabled="disabled"),
                              IMG(_src=throbber,
                                  _height=32, _width=32,
                                  _id="gis_location_%s_throbber" % level,
-                                 _class="throbber hidden"))
+                                 _class="throbber hide"))
                 row = TR(TD(widget), TD(),
                          _id="gis_location_%s__row" % level,
                          _class="%s locselect box_middle" % hidden)
@@ -1705,7 +1841,7 @@ S3.gis.tab = '%s';""" % response.s3.gis.tab
                 elif level not in location_hierarchy:
                     # Hide unused levels
                     # (these can then be enabled for other regions)
-                    hidden = "hidden"
+                    hidden = "hide"
                 try:
                     label = LABEL("%s:" % location_hierarchy[level])
                 except:
@@ -1724,14 +1860,14 @@ S3.gis.tab = '%s';""" % response.s3.gis.tab
                 widget = DIV(INPUT(value=default_id,
                                    _id="gis_location_%s" % level,
                                    _name="gis_location_%s" % level,
-                                   _class="hidden"),
+                                   _class="hide"),
                                 INPUT(value=default_name,
                                       _id="gis_location_%s_ac" % level,
                                       _class="%s" % hidden),
                                 IMG(_src=throbber,
                                     _height=32, _width=32,
                                     _id="gis_location_%s_throbber" % level,
-                                    _class="throbber hidden"))
+                                    _class="throbber hide"))
                 row = TR(TD(widget),
                          TD(ac_help_widget(level)),
                          _class="%s locselect box_middle" % hidden,
@@ -1739,7 +1875,7 @@ S3.gis.tab = '%s';""" % response.s3.gis.tab
                 Lx_rows.append(row)
                 row = TR(INPUT(_id="gis_location_%s_search" % level,
                                _disabled="disabled"), TD(),
-                         _class="hidden locselect box_middle",
+                         _class="hide locselect box_middle",
                          _id="gis_location_%s_search__row" % level)
                 Lx_rows.append(row)
 
@@ -1747,9 +1883,9 @@ S3.gis.tab = '%s';""" % response.s3.gis.tab
         if settings.get_gis_building_name():
             hidden = ""
             if hide_address:
-                hidden = "hidden"
+                hidden = "hide"
             elif value and not represent:
-                hidden = "hidden"
+                hidden = "hide"
             name_rows = DIV(TR(LABEL("%s:" % NAME_LABEL), TD(),
                                _id="gis_location_name_label__row",
                                _class="%s locselect box_middle" % hidden),
@@ -1759,15 +1895,15 @@ S3.gis.tab = '%s';""" % response.s3.gis.tab
                             TR(INPUT(_id="gis_location_name_search",
                                      _disabled="disabled"), TD(),
                                _id="gis_location_name_search__row",
-                               _class="hidden locselect box_middle"))
+                               _class="hide locselect box_middle"))
         else:
             name_rows = ""
 
         hidden = ""
         if hide_address:
-            hidden = "hidden"
+            hidden = "hide"
         elif value and not addr_street:
-            hidden = "hidden"
+            hidden = "hide"
         street_rows = DIV(TR(LABEL("%s:" % STREET_LABEL), TD(),
                              _id="gis_location_street_label__row",
                              _class="%s locselect box_middle" % hidden),
@@ -1777,18 +1913,18 @@ S3.gis.tab = '%s';""" % response.s3.gis.tab
                           TR(INPUT(_id="gis_location_street_search",
                                    _disabled="disabled"), TD(),
                              _id="gis_location_street_search__row",
-                             _class="hidden locselect box_middle"))
+                             _class="hide locselect box_middle"))
         if config.geocoder:
-            geocoder = """
-S3.gis.geocoder = true;"""
+            geocoder = '''
+S3.gis.geocoder=true'''
         else:
             geocoder = ""
 
         hidden = ""
         if hide_address:
-            hidden = "hidden"
+            hidden = "hide"
         elif value and not postcode:
-            hidden = "hidden"
+            hidden = "hide"
         postcode_rows = DIV(TR(LABEL("%s:" % POSTCODE_LABEL), TD(),
                                _id="gis_location_postcode_label__row",
                                _class="%s locselect box_middle" % hidden),
@@ -1798,15 +1934,15 @@ S3.gis.geocoder = true;"""
                             TR(INPUT(_id="gis_location_postcode_search",
                                      _disabled="disabled"), TD(),
                                _id="gis_location_postcode_search__row",
-                               _class="hidden locselect box_middle"))
+                               _class="hide locselect box_middle"))
 
         hidden = ""
         no_latlon = ""
         if not latlon_selector:
-            hidden = "hidden"
-            no_latlon = "S3.gis.no_latlon = true;\n"
+            hidden = "hide"
+            no_latlon = '''S3.gis.no_latlon=true\n'''
         elif value and lat is None:
-            hidden = "hidden"
+            hidden = "hide"
         latlon_help = locations.lat.comment
         converter_button = locations.lon.comment
         converter_button = ""
@@ -1819,7 +1955,7 @@ S3.gis.geocoder = true;"""
                           TR(INPUT(_id="gis_location_lat_search",
                                    _disabled="disabled"), TD(),
                              _id="gis_location_lat_search__row",
-                             _class="hidden locselect box_middle"),
+                             _class="hide locselect box_middle"),
                           TR(LABEL("%s:" % LON_LABEL), TD(),
                                _id="gis_location_lon_label__row",
                                _class="%s locselect box_middle" % hidden),
@@ -1829,7 +1965,7 @@ S3.gis.geocoder = true;"""
                           TR(INPUT(_id="gis_location_lon_search",
                                    _disabled="disabled"), TD(),
                              _id="gis_location_lon_search__row",
-                             _class="hidden locselect box_middle"))
+                             _class="hide locselect box_middle"))
 
         # Map Selector
         PLACE_ON_MAP = T("Place on Map")
@@ -1856,7 +1992,7 @@ S3.gis.geocoder = true;"""
                            IMG(_src=throbber,
                                _height=32, _width=32,
                                _id="gis_location_search_throbber",
-                               _class="throbber hidden"),
+                               _class="throbber hide"),
                            _id="gis_location_search_div")
 
         label = LABEL("%s:" % AUTOCOMPLETE_HELP)
@@ -1864,15 +2000,15 @@ S3.gis.geocoder = true;"""
         select_button = A(T("Select This Location"),
                           _style="cursor:pointer; cursor:hand",
                           _id="gis_location_search_select-btn",
-                          _class="hidden action-btn")
+                          _class="hide action-btn")
 
         search_rows = DIV(TR(label, TD(),
                              _id="gis_location_search_label__row",
-                             _class="hidden locselect box_middle"),
+                             _class="hide locselect box_middle"),
                           TR(TD(widget),
                              TD(select_button),
                              _id="gis_location_search__row",
-                             _class="hidden locselect box_middle"))
+                             _class="hide locselect box_middle"))
         # @ToDo: Hierarchical Filter
         Lx_search_rows = ""
 
@@ -1881,26 +2017,35 @@ S3.gis.geocoder = true;"""
         COUNTRY_REQUIRED = T("Country is required!")
 
         # Settings to be read by static/scripts/S3/s3.locationselector.widget.js
-        js_location_selector = """
+        # Note: Currently we're limited to a single location selector per page
+        js_location_selector = '''
 %s%s%s%s%s%s
-S3.gis.location_id = '%s';
-S3.gis.site = '%s';
-S3.i18n.gis_place_on_map = '%s';
-S3.i18n.gis_view_on_map = '%s';
-S3.i18n.gis_name_required = '%s';
-S3.i18n.gis_country_required = '%s';""" % (country_snippet,
-                                           geocoder,
-                                           navigate_away_confirm,
-                                           no_latlon,
-                                           no_map,
-                                           tab,
-                                           attr["_id"],    # Name of the real location or site field
-                                           site,
-                                           PLACE_ON_MAP,
-                                           VIEW_ON_MAP,
-                                           NAME_REQUIRED,
-                                           COUNTRY_REQUIRED
-                                          )
+S3.gis.location_id='%s'
+S3.gis.site='%s'
+S3.i18n.gis_place_on_map='%s'
+S3.i18n.gis_view_on_map='%s'
+S3.i18n.gis_name_required='%s'
+S3.i18n.gis_country_required="%s"''' % (country_snippet,
+                                        geocoder,
+                                        navigate_away_confirm,
+                                        no_latlon,
+                                        no_map,
+                                        tab,
+                                        attr["_id"],    # Name of the real location or site field
+                                        site,
+                                        PLACE_ON_MAP,
+                                        VIEW_ON_MAP,
+                                        NAME_REQUIRED,
+                                        COUNTRY_REQUIRED
+                                        )
+
+        s3.js_global.append(js_location_selector)
+        if s3.debug:
+            script = "s3.locationselector.widget.js"
+        else:
+            script = "s3.locationselector.widget.min.js"
+
+        s3.scripts.append("/%s/static/scripts/S3/%s" % (appname, script))
 
         # The overall layout of the components
         return TAG[""](TD(
@@ -1918,7 +2063,6 @@ S3.i18n.gis_country_required = '%s';""" % (country_snippet,
                         latlon_rows,
                         divider,
                         TR(map_popup, TD(), _class="box_middle"),
-                        SCRIPT(js_location_selector),
                         requires=requires
                       ), _colspan=2)
 
@@ -1928,22 +2072,17 @@ class S3LatLonWidget(DoubleWidget):
         Widget for latitude or longitude input, gives option to input in terms
         of degrees, minutes and seconds
     """
-    _id = ""
-    _name = ""
-    disabled = False
-    switch_button = False
 
     def __init__(self, type, switch_button=False, disabled=False):
-        self._id="gis_location_%s" % type
-        self._name=self._id
-        self.disabled=disabled
-        self.switch_button=switch_button
+        self._id = "gis_location_%s" % type
+        self._name = self._id
+        self.disabled = disabled
+        self.switch_button = switch_button
 
-    def widget(self,
-               field = None,
-               value = None):
-        s3 = current.response.s3
+    def widget(self, field=None, value=None):
+
         T = current.T
+        s3 = current.response.s3
 
         attr = dict(value=value,
                     _class="decimal %s" % self._class,
@@ -1978,29 +2117,25 @@ class S3LatLonWidget(DoubleWidget):
                   )
 
         if not s3.lat_lon_i18n_appended:
-            s3.js_global.append("""
-S3.i18n.gis_only_numbers =
-  {degrees: '%s', minutes: '%s',seconds: '%s', decimal: '%s'};
-S3.i18n.gis_range_error =
-  {degrees: {lat: '%s', lon: '%s'}, minutes: '%s', seconds: '%s',
-    decimal: {lat: '%s', lon: '%s'}}
-"""     %  (T("Degrees must be a number."),
-            T("Minutes must be a number."),
-            T("Seconds must be a number."),
-            T("Degrees must be a number."),
-            T("Degrees in a latitude must be between -90 to 90."),
-            T("Degrees in a longitude must be between -180 to 180."),
-            T("Minutes must be less than 60."),
-            T("Seconds must be less than 60."),
-            T("Latitude must be between -90 and 90."),
-            T("Longitude must be between -180 and 180.")))
+            s3.js_global.append('''
+S3.i18n.gis_only_numbers={degrees:'%s',minutes:'%s',seconds:'%s',decimal:'%s'}
+S3.i18n.gis_range_error={degrees:{lat:'%s',lon:'%s'},minutes:'%s',seconds:'%s',decimal:{lat:'%s',lon:'%s'}}
+''' %  (T("Degrees must be a number."),
+        T("Minutes must be a number."),
+        T("Seconds must be a number."),
+        T("Degrees must be a number."),
+        T("Degrees in a latitude must be between -90 to 90."),
+        T("Degrees in a longitude must be between -180 to 180."),
+        T("Minutes must be less than 60."),
+        T("Seconds must be less than 60."),
+        T("Latitude must be between -90 and 90."),
+        T("Longitude must be between -180 and 180.")))
 
             s3.lat_lon_i18n_appended = True
 
         if s3.debug and \
             (not "S3/locationselector.widget.css" in s3.stylesheets):
             s3.stylesheets.append("S3/locationselector.widget.css")
-
 
         if (field == None):
             return SPAN(decimal,
@@ -2017,22 +2152,20 @@ S3.i18n.gis_range_error =
 
 # =============================================================================
 class S3CheckboxesWidget(OptionsWidget):
-
     """
         Generates a TABLE tag with <num_column> columns of INPUT
         checkboxes (multiple allowed)
 
         help_lookup_table_name_field will display tooltip help
 
-        :param db: int -
         :param lookup_table_name: int -
         :param lookup_field_name: int -
         :param multple: int -
 
         :param options: list - optional -
         value,text pairs for the Checkboxs -
-        If options = None,  use options from self.requires.options().
-        This argument is useful for displaying a sub-set of the self.requires.options()
+        If options = None,  use options from requires.options().
+        This argument is useful for displaying a sub-set of the requires.options()
 
         :param num_column: int -
 
@@ -2044,7 +2177,6 @@ class S3CheckboxesWidget(OptionsWidget):
     """
 
     def __init__(self,
-                 db = None,
                  lookup_table_name = None,
                  lookup_field_name = None,
                  multiple = False,
@@ -2054,60 +2186,63 @@ class S3CheckboxesWidget(OptionsWidget):
                  help_footer = None
                  ):
 
-        current.db = db
         self.lookup_table_name = lookup_table_name
         self.lookup_field_name =  lookup_field_name
         self.multiple = multiple
-
+        self.options = options
         self.num_column = num_column
-
         self.help_lookup_field_name = help_lookup_field_name
         self.help_footer = help_footer
 
-        if db and lookup_table_name and lookup_field_name:
-            self.requires = IS_NULL_OR(IS_IN_DB(db,
-                                   db[lookup_table_name].id,
-                                   "%(" + lookup_field_name + ")s",
-                                   multiple = multiple))
+    # -------------------------------------------------------------------------
+    def widget(self,
+               field,
+               value = None
+               ):
 
-        if options:
-            self.options = options
-        else:
-            if hasattr(self.requires, "options"):
-                self.options = self.requires.options()
-            else:
-                raise SyntaxError, "widget cannot determine options of %s" % field
-
-
-    def widget( self,
-                field,
-                value = None
-                ):
         if current.db:
             db = current.db
         else:
             db = field._db
 
+        lookup_table_name = self.lookup_table_name
+        lookup_field_name = self.lookup_field_name
+        if lookup_table_name and lookup_field_name:
+            requires = IS_NULL_OR(IS_IN_DB(db,
+                                   db[lookup_table_name].id,
+                                   "%(" + lookup_field_name + ")s",
+                                   multiple = multiple))
+        else:
+            requires = self.requires
+
+        options = self.options
+        if not options:
+            if hasattr(requires, "options"):
+                options = requires.options()
+            else:
+                raise SyntaxError, "widget cannot determine options of %s" % field
+
         values = s3_split_multi_value(value)
 
         attr = OptionsWidget._attributes(field, {})
 
-        num_row  = len(self.options)/self.num_column
+        num_column = self.num_column
+        num_row  = len(options) / num_column
         # Ensure division  rounds up
-        if len(self.options) % self.num_column > 0:
+        if len(options) % num_column > 0:
              num_row = num_row +1
 
         table = TABLE(_id = str(field).replace(".", "_"))
-
-        for i in range(0,num_row):
+        append = table.append
+        for i in range(0, num_row):
             table_row = TR()
-            for j in range(0, self.num_column):
-                # Check that the index is still within self.options
-                index = num_row*j + i
-                if index < len(self.options):
+            for j in range(0, num_column):
+                # Check that the index is still within options
+                index = num_row * j + i
+                if index < len(options):
                     input_options = {}
                     input_options = dict(requires = attr.get("requires", None),
-                                         _value = str(self.options[index][0]),
+                                         _value = str(options[index][0]),
                                          value = values,
                                          _type = "checkbox",
                                          _name = field.name,
@@ -2116,33 +2251,34 @@ class S3CheckboxesWidget(OptionsWidget):
                     tip_attr = {}
                     help_text = ""
                     if self.help_lookup_field_name:
-                        help_text = str(P(s3_get_db_field_value(tablename = self.lookup_table_name,
+                        help_text = str(P(s3_get_db_field_value(tablename = lookup_table_name,
                                                                 fieldname = self.help_lookup_field_name,
-                                                                look_up_value = self.options[index][0],
+                                                                look_up_value = options[index][0],
                                                                 look_up_field = "id")))
                     if self.help_footer:
                         help_text = help_text + str(self.help_footer)
                     if help_text:
                         tip_attr = dict(_class = "s3_checkbox_label",
-                                        #_title = self.options[index][1] + "|" + help_text
+                                        #_title = options[index][1] + "|" + help_text
                                         _rel =  help_text
                                         )
 
-                    #table_row.append(TD(A(self.options[index][1],**option_attr )))
+                    #table_row.append(TD(A(options[index][1],**option_attr )))
                     table_row.append(TD(INPUT(**input_options),
-                                        SPAN(self.options[index][1], **tip_attr)
+                                        SPAN(options[index][1], **tip_attr)
                                         )
                                     )
-            table.append (table_row)
+            append(table_row)
         if self.multiple:
-            table.append(TR(I("(Multiple selections allowed)")))
+            append(TR(I("(Multiple selections allowed)")))
         return table
 
-
+    # -------------------------------------------------------------------------
     def represent(self,
                   value):
-        list = [s3_get_db_field_value(tablename = self.lookup_table_name,
-                                      fieldname = self.lookup_field_name,
+
+        list = [s3_get_db_field_value(tablename = lookup_table_name,
+                                      fieldname = lookup_field_name,
                                       look_up_value = id,
                                       look_up_field = "id")
                    for id in s3_split_multi_value(value) if id]
@@ -2154,11 +2290,10 @@ class S3CheckboxesWidget(OptionsWidget):
 
 # =============================================================================
 class S3MultiSelectWidget(MultipleOptionsWidget):
-
     """
         Standard MultipleOptionsWidget, but using the jQuery UI:
         http://www.quasipartikel.at/multiselect/
-        static/scripts/S3/ui.multiselect.js
+        static/scripts/ui.multiselect.js
     """
 
     def __init__(self):
@@ -2171,24 +2306,24 @@ class S3MultiSelectWidget(MultipleOptionsWidget):
 
         selector = str(field).replace(".", "_")
 
-        s3.js_global.append("""
-S3.i18n.addAll = '%s';
-S3.i18n.removeAll = '%s';
-S3.i18n.itemsCount = '%s';
-S3.i18n.search = '%s';
-""" % (T("Add all"),
+        s3.js_global.append('''
+S3.i18n.addAll='%s'
+S3.i18n.removeAll='%s'
+S3.i18n.itemsCount='%s'
+S3.i18n.search='%s'
+''' % (T("Add all"),
        T("Remove all"),
        T("items selected"),
        T("search")))
 
-        s3.jquery_ready.append("""
-$( '#%s' ).removeClass('list');
-$( '#%s' ).addClass('multiselect');
-$( '#%s' ).multiselect({
-        dividerLocation: 0.5,
-        sortable: false
-    });
-""" % (selector,
+        s3.jquery_ready.append('''
+$('#%s').removeClass('list')
+$('#%s').addClass('multiselect')
+$('#%s').multiselect({
+ dividerLocation:0.5,
+ sortable:false
+})
+''' % (selector,
        selector,
        selector))
 
@@ -2199,7 +2334,6 @@ $( '#%s' ).multiselect({
 
 # =============================================================================
 class S3ACLWidget(CheckboxesWidget):
-
     """
         Widget class for ACLs
 
@@ -2322,15 +2456,14 @@ class CheckboxesWidgetS3(OptionsWidget):
             T = current.T
             opts.append(TR(TD(SPAN(T("no options available"),
                                    _class="no-options-available"),
-                              INPUT(_type="hidden",
+                              INPUT(_type="hide",
                                     _name=field.name,
                                     _value=None))))
 
-        w_index = 0
         for r_index in range(rows):
             tds = []
             for k, v in options[r_index * cols:(r_index + 1) * cols]:
-                field_id = "id_%s_%s" % (field.name, w_index)
+                field_id = "id-%s-%s" % (field.name, k)
                 tds.append(TD(INPUT(_type="checkbox",
                                     _name=field.name,
                                     _id=field_id,
@@ -2339,7 +2472,6 @@ class CheckboxesWidgetS3(OptionsWidget):
                                     _value=k,
                                     value=(str(k) in values)),
                               LABEL(v, _for=field_id)))
-                w_index += 1
             opts.append(TR(tds))
 
         if opts:
@@ -2366,11 +2498,8 @@ class S3AddPersonWidget(FormWidget):
     def __call__(self, field, value, **attributes):
 
         T = current.T
-        db = current.db
-        s3db = current.s3db
-
         request = current.request
-        session = current.session
+        appname = request.application
         s3 = current.response.s3
 
         formstyle = s3.crud.formstyle
@@ -2380,12 +2509,12 @@ class S3AddPersonWidget(FormWidget):
         default = dict(_type = "text",
                        value = (value != None and str(value)) or "")
         attr = StringWidget._attributes(field, default, **attributes)
-        attr["_class"] = "hidden"
+        attr["_class"] = "hide"
 
         if self.select_existing:
             _class ="box_top"
         else:
-            _class = "hidden"
+            _class = "hide"
 
         if self.controller is None:
             controller = request.controller
@@ -2409,8 +2538,7 @@ class S3AddPersonWidget(FormWidget):
                              _id="edit_selected_person_link",
                              _class="action-btn hide",
                              _style="padding-left:15px;"),
-                           IMG(_src="/%s/static/img/ajax-loader.gif" % \
-                                    request.application,
+                           IMG(_src="/%s/static/img/ajax-loader.gif" % appname,
                                _height=32,
                                _width=32,
                                _id="person_load_throbber",
@@ -2425,7 +2553,7 @@ class S3AddPersonWidget(FormWidget):
                         _value=str(value))
 
         # Autocomplete
-        select = "select_person($('#%s').val());" % real_input
+        select = '''select_person($('#%s').val())''' % real_input
         widget = S3PersonAutocompleteWidget(post_process=select)
         ac_row = TR(TD(LABEL("%s: " % T("Name"),
                              _class="hide",
@@ -2438,6 +2566,7 @@ class S3AddPersonWidget(FormWidget):
                     _class="box_top")
 
         # Embedded Form
+        s3db = current.s3db
         ptable = s3db.pr_person
         ctable = s3db.pr_contact
         fields = [ptable.first_name,
@@ -2495,7 +2624,7 @@ class S3AddPersonWidget(FormWidget):
         else:
             script = "s3.select_person.min.js"
 
-        s3.scripts.append( "%s/%s" % (s3.script_dir, script))
+        s3.scripts.append("/%s/static/scripts/S3/%s" % (appname, script))
 
         # Overall layout of components
         return TAG[""](select_row,
@@ -2552,7 +2681,6 @@ class S3AddObjectWidget(FormWidget):
 
         self.form_url = form_url
         self.table_name = table_name
-
         self.dummy_field_selector = dummy_field_selector
         self.on_show = on_show
         self.on_hide = on_hide
@@ -2562,19 +2690,16 @@ class S3AddObjectWidget(FormWidget):
         T = current.T
         s3 = current.response.s3
 
-        script_name = "%s/%s" % (
-                s3.script_dir,
-                [
-                    "jquery.ba-resize.min.js",
-                    "jquery.ba-resize.js",
-                ][current.deployment_settings.base.debug]
-            )
+        if s3.debug:
+            script_name = "/%s/static/scripts/jquery.ba-resize.js"
+        else:
+            script_name = "/%s/static/scripts/jquery.ba-resize.min.js"
 
         if script_name not in s3.scripts:
             s3.scripts.append(script_name)
         return TAG[""](
             # @ToDo: this might be better moved to its own script.
-            SCRIPT("""
+            SCRIPT('''
 $(function () {
     var form_field = $('#%(form_field_name)s')
     var throbber = $('<div id="%(form_field_name)s_ajax_throbber" class="ajax_throbber"/>')
@@ -2710,7 +2835,7 @@ $(function () {
     var add_object_link = $('<a>%(Add)s</a>')
     add_object_link.click(request_add_form)
     add_object_link.insertAfter(form_field)
-})""" % dict(
+})''' % dict(
             field_name = field.name,
             form_field_name = "_".join((self.table_name, field.name)),
             form_url = self.form_url,
@@ -2766,9 +2891,8 @@ class S3SearchAutocompleteWidget(FormWidget):
         hidden_input = INPUT(value = value or "",
                              requires = field.requires,
                              _id = "%s_%s" % (tablename, field.name),
-                             _class = "hidden_input",
+                             _class = "hide hide_input",
                              _name = field.name,
-                             _style= "display: none;",
                             )
 
         return TAG[""](
@@ -2791,7 +2915,6 @@ class S3TimeIntervalWidget(FormWidget):
     @staticmethod
     def widget(field, value, **attributes):
 
-        T = current.T
         multipliers = S3TimeIntervalWidget.multipliers
 
         if value is None:
@@ -2826,7 +2949,6 @@ class S3TimeIntervalWidget(FormWidget):
     @staticmethod
     def represent(value):
 
-        T = current.T
         multipliers = S3TimeIntervalWidget.multipliers
 
         try:
@@ -2843,13 +2965,13 @@ class S3TimeIntervalWidget(FormWidget):
                     break
 
         val = val / multiplier[1]
-        return "%s %s" % (val, T(multiplier[0]))
+        return "%s %s" % (val, current.T(multiplier[0]))
 
 # =============================================================================
 class S3InvBinWidget(FormWidget):
     """
         Widget used by S3CRUD to offer the user matching bins where
-        stock itesm can be placed
+        stock items can be placed
     """
 
     def __init__(self,
@@ -2858,13 +2980,11 @@ class S3InvBinWidget(FormWidget):
 
     def __call__(self, field, value, **attributes):
 
+        T = current.T
         request = current.request
-        response = current.response
-        db = current.db
         s3db = current.s3db
         tracktable = s3db.inv_track_item
         stocktable = s3db.inv_inv_item
-        T = current.T
 
         new_div = INPUT(value = value or "",
                         requires = field.requires,
@@ -2890,7 +3010,8 @@ class S3InvBinWidget(FormWidget):
                 (stocktable.pack_value == record.pack_value) & \
                 (stocktable.expiry_date == record.expiry_date) & \
                 (stocktable.supply_org_id == record.supply_org_id)
-        rows = db(query).select(stocktable.bin,stocktable.id)
+        rows = current.db(query).select(stocktable.bin,
+                                        stocktable.id)
         if len(rows) == 0:
             return TAG[""](
                            new_div
@@ -2935,9 +3056,9 @@ class S3EmbedComponentWidget(FormWidget):
         self.select_existing = select_existing
         self.link_filter = link_filter
 
-        manager = current.manager
-        model = manager.model
-        self.post_process = model.get_config(link, "post_process", None)
+        self.post_process = current.manager.model.get_config(link,
+                                                             "post_process",
+                                                             None)
 
     def __call__(self, field, value, **attributes):
 
@@ -2946,7 +3067,9 @@ class S3EmbedComponentWidget(FormWidget):
         s3db = current.s3db
 
         request = current.request
+        appname = request.application
         s3 = current.response.s3
+        appname = current.request.application
 
         formstyle = s3.crud.formstyle
 
@@ -2965,12 +3088,12 @@ class S3EmbedComponentWidget(FormWidget):
         default = dict(_type = "text",
                        value = (value != None and str(value)) or "")
         attr = StringWidget._attributes(field, default, **attributes)
-        attr["_class"] = "hidden"
+        attr["_class"] = "hide"
 
         if self.select_existing:
             _class ="box_top"
         else:
-            _class = "hidden"
+            _class = "hide"
 
         # Post-process selection/deselection
         if self.post_process is not None:
@@ -2989,7 +3112,7 @@ class S3EmbedComponentWidget(FormWidget):
             clear = "%s%s" % (clear, pp)
 
         # Select from registry buttons
-        url = "/%s/%s/%s/" % (request.application, prefix, resourcename)
+        url = "/%s/%s/%s/" % (appname, prefix, resourcename)
         select_row = TR(TD(A(T("Select from registry"),
                              _href="#",
                              _id="select_from_registry",
@@ -3007,7 +3130,7 @@ class S3EmbedComponentWidget(FormWidget):
                              _class="action-btn hide",
                              _style="padding-left:15px;"),
                            IMG(_src="/%s/static/img/ajax-loader.gif" % \
-                                    request.application,
+                                    appname,
                                _height=32,
                                _width=32,
                                _id="load_throbber",
@@ -3066,7 +3189,7 @@ class S3EmbedComponentWidget(FormWidget):
                 if not isinstance(requires, (list, tuple)):
                     requires = [requires]
                 [r.set_self_id(selected) for r in requires
-                                         if hasattr(r, 'set_self_id')]
+                                         if hasattr(r, "set_self_id")]
         labels, required = s3_mark_required(fields)
         if required:
             s3.has_required = True
@@ -3096,7 +3219,7 @@ class S3EmbedComponentWidget(FormWidget):
         else:
             script = "s3.embed_component.min.js"
 
-        s3.scripts.append( "%s/%s" % (s3.script_dir, script))
+        s3.scripts.append("/%s/static/scripts/S3/%s" % (appname, script))
 
         # Overall layout of components
         return TAG[""](select_row,
@@ -3134,10 +3257,10 @@ def s3_richtext_widget(field, value):
     s3.scripts.append(adapter)
 
     # Toolbar options: http://docs.cksource.com/CKEditor_3.x/Developers_Guide/Toolbar
-    js = "var ck_config = {toolbar:[['Format','Bold','Italic','-','NumberedList','BulletedList','-','Link','Unlink','-','Image','Table','-','PasteFromWord','-','Source','Maximize']],toolbarCanCollapse:false,removePlugins:'elementspath'};"
+    js = '''var ck_config={toolbar:[['Format','Bold','Italic','-','NumberedList','BulletedList','-','Link','Unlink','-','Image','Table','-','PasteFromWord','-','Source','Maximize']],toolbarCanCollapse:false,removePlugins:'elementspath'}'''
     s3.js_global.append(js)
 
-    js = "$('#%s').ckeditor(ck_config);" % id
+    js = '''$('#%s').ckeditor(ck_config)''' % id
     s3.jquery_ready.append(js)
 
     return TEXTAREA(_name=field.name,
@@ -3148,7 +3271,6 @@ def s3_richtext_widget(field, value):
 
 # =============================================================================
 class S3SliderWidget(FormWidget):
-
     """
         Standard Slider Widget
 
@@ -3178,7 +3300,7 @@ class S3SliderWidget(FormWidget):
         localfield = str(field).split(".")
         sliderinput = INPUT(_name=localfield[1],
                             _id=inputid,
-                            _class="hidden",
+                            _class="hide",
                             _value=self.value)
 
         response.s3.jquery_ready.append("S3.slider('%s','%f','%f','%f','%f');\n" % \

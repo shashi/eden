@@ -30,6 +30,7 @@
 from gluon import current
 from tests.web2unittest import SeleniumUnitTest
 
+
 class CreateProject(SeleniumUnitTest):
     def test_project001_create_project(self):
         """
@@ -47,7 +48,7 @@ class CreateProject(SeleniumUnitTest):
         print "\n"
 
         # Login, if not-already done so
-        self.login(account="normal", nexturl="project/project/create")
+        self.login(account="admin", nexturl="project/project/create")
         
         self.create("project_project", 
                     [( "name",
@@ -57,12 +58,8 @@ class CreateProject(SeleniumUnitTest):
                     [( "organisation_id",
                        "Timor-Leste Red Cross Society",
                        "autocomplete"),
-                     ( "role",
-                       "Lead Implementer",
-                       "option"),
-                     ( "currency_type",
-                       "USD",
-                       "option"),
+                     ( "currency",
+                       "USD",),
                      ( "comments",
                        "Host National Society")
                      ]
@@ -80,15 +77,14 @@ class CreateProject(SeleniumUnitTest):
                        "option"),
                      ( "amount",
                        "1000"),
-                     ( "currency_type",
-                       "USD",
-                       "option"),
+                     ( "currency",
+                       "USD"),
                      ( "comments",
                        "International Donation")
                      ]
                      )
         
-        self.browser.find_element_by_id("rheader_tab_community").click()
+        self.browser.find_element_by_id("rheader_tab_location").click()
         
         self.create("project_location", 
                     [( "L0",

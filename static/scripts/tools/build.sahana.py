@@ -155,7 +155,7 @@ def dojs(dogis = False, warnings = True):
 
     # Also do dataTables
     print "Compressing dataTables"
-    sourceDirectorydataTables = "../S3"
+    sourceDirectorydataTables = ".."
     configFilenamedataTables = "sahana.js.dataTables.cfg"
     outputFilenamedataTables = "s3.dataTables.min.js"
     mergeddataTables = mergejs.run(sourceDirectorydataTables,
@@ -168,6 +168,19 @@ def dojs(dogis = False, warnings = True):
     except:
         pass
     shutil.move(outputFilenamedataTables, "../S3")
+
+    # Also do s3.locationselector.widget.js
+    print "Compressing s3.locationselector.widget.js"
+    inputFilename = os.path.join("..", "S3", "s3.locationselector.widget.js")
+    outputFilename = "s3.locationselector.widget.min.js"
+    input = open(inputFilename, "r").read()
+    minimized = minimize(input)
+    open(outputFilename, "w").write(minimized)
+    try:
+        os.remove("../S3/%s" % outputFilename)
+    except:
+        pass
+    shutil.move(outputFilename, "../S3")
 
     # Also do s3.embed_component.js
     print "Compressing s3.embed_component.js"
@@ -414,7 +427,7 @@ def docss():
         file = p.sub("", file)
         listCSS.append("../../styles/%s" % file)
 
-    outputFilenameCSS = "sahana.min.css"
+    outputFilenameCSS = "eden.min.css"
 
     # Merge CSS files
     print "Merging Core styles."
@@ -425,15 +438,13 @@ def docss():
     compressCSS(mergedCSS, outputFilenameCSS)
 
     # Move files to correct locations
-    if theme == "default":
-        theme = "S3"
     print "Deleting %s." % outputFilenameCSS
     try:
-        os.remove("../../styles/%s/%s" % (theme, outputFilenameCSS))
+        os.remove("../../themes/%s/%s" % (theme, outputFilenameCSS))
     except:
         pass
     print "Moving new %s." % outputFilenameCSS
-    shutil.move(outputFilenameCSS, "../../styles/%s" % theme)
+    shutil.move(outputFilenameCSS, "../../themes/%s" % theme)
 
 def main(argv):
     try:

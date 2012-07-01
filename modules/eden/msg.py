@@ -34,7 +34,7 @@ __all__ = ["S3MessagingModel",
            "S3TropoModel",
            "S3TwitterModel",
            "S3XFormsModel",
-           "S3ParsingModel"
+           "S3ParsingModel",
         ]
 
 from gluon import *
@@ -62,7 +62,8 @@ class S3MessagingModel(S3Model):
         db = current.db
         s3 = current.response.s3
         msg = current.msg
-
+        s3db = current.s3db
+        
         UNKNOWN_OPT = current.messages.UNKNOWN_OPT
 
         # Message priority
@@ -71,9 +72,13 @@ class S3MessagingModel(S3Model):
             2:T("Medium"),
             1:T("Low")
         }
-        source_task_id = S3ReusableField("source_task_id", db.scheduler_task,
-                                             requires = IS_NULL_OR(IS_ONE_OF(db, "scheduler_task.id")),
-                                             ondelete = "RESTRICT")
+        
+        mtable = s3db.msg_inbound_email_settings
+        source_opts = []
+        records = db(mtable.id>0).select(mtable.username)
+        for record in records:
+            source_opts += [record.username]
+        
         
         # ---------------------------------------------------------------------
         # Message Log - all Inbound & Outbound Messages
@@ -105,8 +110,10 @@ class S3MessagingModel(S3Model):
                                         label = T("Parsing Status")),
                                   Field("reply", "text" ,
                                         label = T("Reply")),
-                                  source_task_id(label="Source ID"),                                                                         
-                                  *s3.meta_fields())
+                                  Field("source_task_id",
+                                        requires = IS_IN_SET(source_opts,
+                                                             zero = None)),                                                                       
+                                  *s3_meta_fields())
 
         self.configure(tablename,
                        list_fields=["id",
@@ -144,7 +151,7 @@ class S3MessagingModel(S3Model):
         # @ToDo: have separate limits for Email & SMS
         tablename = "msg_limit"
         table = self.define_table(tablename,
-                                  *s3.timestamp())
+                                  *s3_timestamp())
 
         # ---------------------------------------------------------------------
         # Message Tag - Used to tag a message to a resource
@@ -155,7 +162,7 @@ class S3MessagingModel(S3Model):
                                   # Field("record_uuid", # null in this field implies subscription to the entire resource
                                         # type=s3uuid,
                                         # length=128),
-                                  # *s3.meta_fields())
+                                  # *s3_meta_fields())
 
         # self.configure(tablename,
                        # list_fields=[ "id",
@@ -204,7 +211,7 @@ class S3MessagingModel(S3Model):
                                   opt_msg_status(),
                                   Field("system_generated", "boolean", default = False),
                                   Field("log"),
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         self.configure(tablename,
                        list_fields=[ "id",
@@ -227,10 +234,10 @@ class S3MessagingModel(S3Model):
                                                              zero=None),
                                         default = "EMAIL"),
                                   Field("log"),
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         # ---------------------------------------------------------------------
-        # Pass variables back to global scope (response.s3.*)
+        # Pass variables back to global scope (s3db.*)
         return Storage(
                 msg_message_id=message_id,
             )
@@ -297,7 +304,7 @@ class S3InboundEmailModel(S3Model):
                                   # Set true to delete messages from the remote
                                   # inbox after fetching them.
                                   Field("delete_from_server", "boolean"),
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         # Incoming Email
         tablename = "msg_email_inbox"
@@ -305,7 +312,7 @@ class S3InboundEmailModel(S3Model):
                                   Field("sender", notnull=True),
                                   Field("subject", length=78),    # RFC 2822
                                   Field("body", "text"),
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
         table.sender.requires = IS_EMAIL()
         table.sender.label = T("Sender")
         #table.sender.comment = SPAN("*", _class="req")
@@ -368,7 +375,7 @@ class S3SMSModel(S3Model):
                                   # Moved to deployment_settings
                                   #Field("default_country_code", "integer",
                                   #      default=44),
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         # ---------------------------------------------------------------------
         tablename = "msg_modem_settings"
@@ -380,7 +387,7 @@ class S3SMSModel(S3Model):
                                   Field("enabled", "boolean", default = True),
                                   # To be used later
                                   #Field("preference", "integer", default = 5),
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         # ---------------------------------------------------------------------
         tablename = "msg_api_settings"
@@ -396,7 +403,7 @@ class S3SMSModel(S3Model):
                                   Field("enabled", "boolean", default = True),
                                   # To be used later
                                   #Field("preference", "integer", default = 5),
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         # ---------------------------------------------------------------------
         tablename = "msg_smtp_to_sms_settings"
@@ -409,7 +416,7 @@ class S3SMSModel(S3Model):
                                   Field("enabled", "boolean", default = True),
                                   # To be used later
                                   #Field("preference", "integer", default = 5),
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         # ---------------------------------------------------------------------
         return Storage()
@@ -466,7 +473,7 @@ class S3SubscriptionModel(S3Model):
                                         ),
                                   person_id(label = T("Person"),
                                             default = auth.s3_logged_in_person()),
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         self.configure("msg_subscription",
                        list_fields=["subscribe_mode",
@@ -497,7 +504,7 @@ class S3TropoModel(S3Model):
         table = self.define_table(tablename,
                                   Field("token_messaging"),
                                   #Field("token_voice"),
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         # ---------------------------------------------------------------------
         # Tropo Scratch pad for outbound messaging
@@ -536,7 +543,7 @@ class S3TwitterModel(S3Model):
                                   Field("oauth_secret",
                                         readable = False, writable = False),
                                   Field("twitter_account", writable = False),
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         self.configure(tablename,
                        onvalidation=self.twitter_settings_onvalidation)
@@ -546,7 +553,7 @@ class S3TwitterModel(S3Model):
         tablename = "msg_twitter_search"
         table = self.define_table(tablename,
                                   Field("search_query", length = 140),
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         # ---------------------------------------------------------------------
         tablename = "msg_twitter_search_results"
@@ -555,7 +562,7 @@ class S3TwitterModel(S3Model):
                                   Field("posted_by"),
                                   Field("posted_at"),
                                   Field("twitter_search", db.msg_twitter_search),
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         #table.twitter_search.requires = IS_ONE_OF(db, "twitter_search.search_query")
         #table.twitter_search.represent = lambda id: db(db.msg_twitter_search.id == id).select(db.msg_twitter_search.search_query,
@@ -642,8 +649,7 @@ class S3XFormsModel(S3Model):
         # ---------------------------------------------------------------------
         return Storage()
     
-# ---------------------------------------------------------------------
-        
+# =============================================================================
 class S3ParsingModel(S3Model):
     """
         Message Parsing Model
@@ -653,28 +659,35 @@ class S3ParsingModel(S3Model):
 
     def model(self):
 
+        from s3 import s3parser
+        import inspect
+        
         T = current.T
-        s3 = current.response.s3
-        db = current.db
-        # Reusable Source Task ID
-        source_task_id = S3ReusableField("source_task_id", db.scheduler_task,
-                                     requires = IS_NULL_OR(IS_ONE_OF(db, "scheduler_task.id")),
-                                     ondelete = "RESTRICT")
-        # Reusable Workflow Task ID
-        workflow_task_id = S3ReusableField("workflow_task_id", db.scheduler_task,
-                                     requires = IS_NULL_OR(IS_ONE_OF(db, "scheduler_task.id")),
-                                     ondelete = "RESTRICT")
+        mtable = self.msg_inbound_email_settings
+        # source_opts contain the available message sources.
+        source_opts = []
+        records = current.db(mtable.deleted == False).select(mtable.username)
+        for record in records:
+            source_opts += [record.username]
+
+        # Dynamic lookup of the parsing functions in S3Parsing class.
+        parsers = inspect.getmembers(s3parser.S3Parsing, predicate=inspect.isfunction)
+        parse_opts = []
+        for parser in parsers:
+            parse_opts += [parser[0]]
 
         tablename = "msg_workflow"
         table = self.define_table(tablename,
-                                source_task_id(),
-                                workflow_task_id(),
-                                *s3.meta_fields())
-        
+                                  Field("source_task_id",
+                                        label = T("Inbound Message Source"),
+                                        requires = IS_IN_SET(source_opts,
+                                                             zero = None)),
+                                  Field("workflow_task_id",
+                                        label = T("Workflow"),
+                                        requires = IS_IN_SET(parse_opts,
+                                                             zero=None)), 
+                                  *s3_meta_fields())
 
         return Storage()
- 
-
-
 
 # END =========================================================================

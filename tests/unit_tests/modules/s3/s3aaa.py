@@ -8,7 +8,7 @@
 import unittest
 
 from gluon import current
-from s3aaa import S3EntityRoleManager
+from s3.s3aaa import S3EntityRoleManager
 
 # =============================================================================
 class S3AuthTests(unittest.TestCase):
@@ -915,7 +915,7 @@ class S3PermissionTests(unittest.TestCase):
 
             self.assertTrue(isinstance(acls, Storage))
             self.assertTrue(org2 in acls)
-            self.assertEqual(acls[org2], (acl.READ|acl.CREATE, acl.ALL))
+            self.assertEqual(acls[org2], (acl.READ, acl.ALL))
 
         finally:
             s3db.pr_remove_affiliation(org1, org2, role="TestOrgUnit")
@@ -930,6 +930,7 @@ class S3PermissionTests(unittest.TestCase):
     def create_test_record(self):
 
         # Create a record
+        auth.s3_impersonate(None)
         auth.override = True
         table = s3db.org_office
         record_id = table.insert(name="New Office")
@@ -2699,15 +2700,30 @@ class S3EntityRoleManagerTests(unittest.TestCase):
         auth.s3_assign_role(self.user_id, "project_editor", for_pe=self.org_id)
 
     def testGetAssignedRoles(self):
-        self.assertEqual(self.rm.get_assigned_roles(entity_id=self.org_id),
-                         {self.user_id: ["staff_reader", "project_editor"]})
+        roles = self.rm.get_assigned_roles(entity_id=self.org_id)
+        self.assertTrue(self.user_id in roles)
+        assigned_roles = roles[self.user_id]
+        self.assertEqual(len(assigned_roles), 2)
+        self.assertTrue("staff_reader" in assigned_roles)
+        self.assertTrue("project_editor" in assigned_roles)
 
-        self.assertEqual(self.rm.get_assigned_roles(entity_id=self.org_id,
-                                                    user_id=self.user_id),
-                         {self.user_id: ["staff_reader", "project_editor"]})
+        roles = self.rm.get_assigned_roles(entity_id=self.org_id,
+                                           user_id=self.user_id)
+        self.assertTrue(self.user_id in roles)
+        assigned_roles = roles[self.user_id]
+        self.assertEqual(len(assigned_roles), 2)
+        self.assertTrue("staff_reader" in assigned_roles)
+        self.assertTrue("project_editor" in assigned_roles)
 
         self.assertEqual(self.rm.get_assigned_roles(user_id=self.user_id),
                          {self.org_id: ["staff_reader", "project_editor"]})
+
+        roles = self.rm.get_assigned_roles(user_id=self.user_id)
+        self.assertTrue(self.org_id in roles)
+        assigned_roles = roles[self.org_id]
+        self.assertEqual(len(assigned_roles), 2)
+        self.assertTrue("staff_reader" in assigned_roles)
+        self.assertTrue("project_editor" in assigned_roles)
 
         self.assertRaises(RuntimeError, self.rm.get_assigned_roles)
 

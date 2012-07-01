@@ -168,7 +168,7 @@ class S3RequestModel(S3Model):
                                                         maximum=request.utcnow.date(),
                                                         error_message="%s %%(max)s!" %
                                                             T("Enter a valid past date"),
-                                                        format = s3_date_format))],
+                                                        format=s3_date_format))],
                                         # @ToDo: deployment_setting
                                         #widget = S3DateTimeWidget(past=8760, # Hours, so 1 year
                                         #                          future=0),
@@ -202,7 +202,7 @@ class S3RequestModel(S3Model):
                                                       minimum=request.utcnow.date() - datetime.timedelta(days=1),
                                                       error_message="%s %%(min)s!" %
                                                             T("Enter a valid past date"),
-                                                        format = s3_date_format))],
+                                                        format=s3_date_format))],
                                         # @ToDo: deployment_setting
                                         #widget = S3DateTimeWidget(past=0,
                                         #                          future=8760), # Hours, so 1 year
@@ -302,8 +302,8 @@ class S3RequestModel(S3Model):
                                         "boolean",
                                         label = T("Cancel"),
                                         default = False),
-                                  s3.comments(comment=""),
-                                  *s3.meta_fields())
+                                  s3_comments(comment=""),
+                                  *s3_meta_fields())
 
         if len(req_type_opts) == 1:
             k,v = req_type_opts.popitem()
@@ -461,7 +461,7 @@ $(function() {
                       req_req="req_id")
 
         # ---------------------------------------------------------------------
-        # Pass variables back to global scope (response.s3.*)
+        # Pass variables back to global scope (s3db.*)
         #
         return Storage(
                 req_req_id = req_id,
@@ -894,7 +894,6 @@ class S3RequestItemModel(S3Model):
         db = current.db
         s3 = current.response.s3
 
-        currency_type = s3.currency_type
         site_id = self.org_site_id
         item_id = self.supply_item_entity_id
         supply_item_id = self.supply_item_id
@@ -926,7 +925,7 @@ class S3RequestItemModel(S3Model):
                                         "double",
                                         label = T("Estimated Value per Pack")),
                                   # @ToDo: Move this into a Currency Widget for the pack_value field
-                                  currency_type("currency"),
+                                  s3_currency(),
                                   site_id,
                                   Field("quantity_commit",
                                         "double",
@@ -950,8 +949,8 @@ class S3RequestItemModel(S3Model):
                                         default = 0,
                                         requires = IS_FLOAT_IN_RANGE(minimum=0),
                                         writable = quantities_writable),
-                                  s3.comments(),
-                                  *s3.meta_fields())
+                                  s3_comments(),
+                                  *s3_meta_fields())
 
         table.site_id.label = T("Requested From")
 
@@ -1031,7 +1030,7 @@ $(document).ready(function() {
                                     ])
 
         # ---------------------------------------------------------------------
-        # Pass variables back to global scope (response.s3.*)
+        # Pass variables back to global scope (s3db.*)
         #
         return Storage(
                 req_item_id = req_item_id,
@@ -1187,7 +1186,7 @@ class S3RequestSkillModel(S3Model):
         use_commit = settings.get_req_use_commit()
 
         define_table = self.define_table
-        meta_fields = s3.meta_fields
+        meta_fields = s3_meta_fields
 
         # -----------------------------------------------------------------
         # Request Skills
@@ -1228,7 +1227,7 @@ class S3RequestSkillModel(S3Model):
                                    label = T("Quantity Fulfilled"),
                                    default = 0,
                                    writable = quantities_writable),
-                             s3.comments(label = T("Task Details"),
+                             s3_comments(label = T("Task Details"),
                                          comment = DIV(_class="tooltip",
                                                        _title="%s|%s" % (T("Task Details"),
                                                                         T("Include any special requirements such as equipment which they need to bring.")))),
@@ -1284,7 +1283,7 @@ class S3RequestSkillModel(S3Model):
                                     ])
 
         # ---------------------------------------------------------------------
-        # Pass variables back to global scope (response.s3.*)
+        # Pass variables back to global scope (s3db.*)
         #
         return Storage()
 
@@ -1361,14 +1360,14 @@ class S3CommitModel(S3Model):
                                         writable=False),
                                   Field("date",
                                         "date",
-                                        requires = IS_EMPTY_OR(IS_DATE(format = s3_date_format)),
+                                        requires = IS_EMPTY_OR(IS_DATE(format=s3_date_format)),
                                         widget = S3DateWidget(),
                                         default = request.utcnow,
                                         label = T("Date"),
                                         represent = s3_date_represent),
                                   Field("date_available",
                                         "date",
-                                        requires = IS_EMPTY_OR(IS_DATE(format = s3_date_format)),
+                                        requires = IS_EMPTY_OR(IS_DATE(format=s3_date_format)),
                                         widget = S3DateWidget(),
                                         label = T("Date Available"),
                                         represent = s3_date_represent),
@@ -1376,8 +1375,8 @@ class S3CommitModel(S3Model):
                                             default = auth.s3_logged_in_person(),
                                             label = T("Committed By"),
                                             comment = self.pr_person_comment(child="committer_id")),
-                                  s3.comments(),
-                                  *s3.meta_fields())
+                                  s3_comments(),
+                                  *s3_meta_fields())
 
         # CRUD strings
         ADD_COMMIT = T("Make Commitment")
@@ -1424,7 +1423,7 @@ class S3CommitModel(S3Model):
                            req_commit="commit_id")
 
         # ---------------------------------------------------------------------
-        # Pass variables back to global scope (response.s3.*)
+        # Pass variables back to global scope (s3db.*)
         #
         return Storage(
                     req_commit_id = commit_id,
@@ -1545,8 +1544,8 @@ class S3CommitItemModel(S3Model):
                                         "double",
                                         label = T("Quantity"),
                                         notnull = True),
-                                  s3.comments(),
-                                  *s3.meta_fields())
+                                  s3_comments(),
+                                  *s3_meta_fields())
 
         # pack_quantity virtual field
         if item_pack_virtualfields:
@@ -1573,7 +1572,7 @@ class S3CommitItemModel(S3Model):
                        onaccept = self.commit_item_onaccept )
 
         # ---------------------------------------------------------------------
-        # Pass variables back to global scope (response.s3.*)
+        # Pass variables back to global scope (s3db.*)
         #
         return Storage(
                 # Used by commit_req() controller
@@ -1646,8 +1645,8 @@ class S3CommitPersonModel(S3Model):
                                   multi_skill_id(writable=False, comment=None),
                                   # This should be person not hrm as we want to mark them as allocated
                                   person_id(),
-                                  s3.comments(),
-                                  *s3.meta_fields())
+                                  s3_comments(),
+                                  *s3_meta_fields())
 
         # CRUD strings
         ADD_COMMIT_PERSON = T("Add Person to Commitment")
@@ -1671,7 +1670,7 @@ class S3CommitPersonModel(S3Model):
         #                onaccept = self.commit_person_onaccept)
 
         # ---------------------------------------------------------------------
-        # Pass variables back to global scope (response.s3.*)
+        # Pass variables back to global scope (s3db.*)
         #
         return Storage()
 
@@ -1685,15 +1684,13 @@ class S3CommitPersonModel(S3Model):
         db = current.db
         s3db = current.s3db
         s3mgr = current.manager
-        s3 = current.response.s3
-
         table = s3db.req_commit_person
         rstable = s3db.req_req_skill
 
         # Try to get req_skill_id from the form
         req_skill_id = 0
         if form:
-            req_skill_id = form.vars.get("req_skill_id")
+            req_skill_id = form.vars.get("req_skill_id", None)
         if not req_skill_id:
             commit_skill_id = s3mgr.get_session("req", "commit_skill")
             r_commit_skill = table[commit_skill_id]
@@ -1721,22 +1718,22 @@ def req_item_onaccept(form):
         Partial = some items have quantity > 0
         Complete = quantity_x = quantity(requested) for ALL items
     """
-    s3mgr = current.manager
 
-    if form and form.vars.req_id:
-        req_id = form.vars.req_id
-    else:
-        req_id = s3mgr.get_session("req", "req")
+    req_id = form.vars.get("req_id", None)
     if not req_id:
-        # @todo: should raise a proper HTTP status here
-        raise Exception("can not get req_id")
+        req_id = current.manager.get_session("req", "req")
+    if not req_id:
+        raise HTTP(500, "can not get req_id")
 
     req_update_status(req_id)
 
+# =============================================================================
 def req_update_status(req_id):
+    """
+    """
+
     db = current.db
     s3db = current.s3db
-
     table = s3db.req_req_item
     is_none = dict(commit = True,
                    transit = True,
@@ -1784,19 +1781,15 @@ def req_skill_onaccept(form):
         Create a Task for People to be assigned to
     """
 
-    db = current.db
-    s3db = current.s3db
-    s3mgr = current.manager
-    settings = current.deployment_settings
-
     if form and form.vars.req_id:
         req_id = form.vars.req_id
     else:
-        req_id = s3mgr.get_session("req", "req")
+        req_id = current.manager.get_session("req", "req")
     if not req_id:
-        # @ToDo: should raise a proper HTTP status here
-        raise Exception("can not get req_id")
+        raise HTTP(500, "can not get req_id")
 
+    db = current.db
+    s3db = current.s3db
     rtable = s3db.req_req
     query = (rtable.id == req_id)
     record = db(query).select(rtable.purpose,
@@ -1841,7 +1834,7 @@ def req_skill_onaccept(form):
     query = (rtable.id == req_id)
     db(query).update(**status_update)
 
-    if settings.has_module("project"):
+    if current.deployment_settings.has_module("project"):
         # Add a Task to which the People can be assigned
 
         # Get the request record

@@ -71,8 +71,8 @@ class S3ScenarioModel(S3Model):
                                   Field("name", notnull=True,
                                         length=64,    # Mayon compatiblity
                                         label=T("Name")),
-                                  s3.comments(),
-                                  *s3.meta_fields())
+                                  s3_comments(),
+                                  *s3_meta_fields())
 
         self.configure(tablename,
                        # Open Map Config to set the default Location
@@ -167,7 +167,7 @@ class S3ScenarioModel(S3Model):
                                     )
 
         # ---------------------------------------------------------------------
-        # Pass variables back to global scope (response.s3.*)
+        # Pass variables back to global scope (s3db.*)
         #
         return Storage(
                 scenario_scenario_id = scenario_id,
@@ -245,7 +245,7 @@ class S3ScenarioAssetModel(S3Model):
         table = self.define_table(tablename,
                                   scenario_id(),
                                   asset_id(),
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         s3.crud_strings[tablename] = Storage(
             title_create = T("Add Asset"),
@@ -263,7 +263,7 @@ class S3ScenarioAssetModel(S3Model):
             msg_list_empty = T("No Assets currently registered in this scenario"))
 
         # ---------------------------------------------------------------------
-        # Pass variables back to global scope (response.s3.*)
+        # Pass variables back to global scope (s3db.*)
         #
         return Storage()
 
@@ -291,7 +291,7 @@ class S3ScenarioHRModel(S3Model):
         table = self.define_table(tablename,
                                   scenario_id(),
                                   human_resource_id(),
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         s3.crud_strings[tablename] = Storage(
             title_create = T("Add Human Resource"),
@@ -309,7 +309,7 @@ class S3ScenarioHRModel(S3Model):
             msg_list_empty = T("No Human Resources currently registered in this scenario"))
 
         # ---------------------------------------------------------------------
-        # Pass variables back to global scope (response.s3.*)
+        # Pass variables back to global scope (s3db.*)
         #
         return Storage()
 
@@ -338,7 +338,7 @@ class S3ScenarioMapModel(S3Model):
         table = self.define_table(tablename,
                                   scenario_id(),
                                   config_id(),
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         s3.crud_strings[tablename] = Storage(
             title_create = T("Add Map Configuration"),
@@ -356,7 +356,7 @@ class S3ScenarioMapModel(S3Model):
             msg_list_empty = T("No Map Configurations currently registered in this scenario"))
 
         # ---------------------------------------------------------------------
-        # Pass variables back to global scope (response.s3.*)
+        # Pass variables back to global scope (s3db.*)
         #
         return Storage()
 
@@ -384,7 +384,7 @@ class S3ScenarioSiteModel(S3Model):
         table = self.define_table(tablename,
                                   scenario_id(),
                                   site_id,
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         table.site_id.readable = table.site_id.writable = True
 
@@ -404,7 +404,7 @@ class S3ScenarioSiteModel(S3Model):
             msg_list_empty = T("No Facilities currently registered in this scenario"))
 
         # ---------------------------------------------------------------------
-        # Pass variables back to global scope (response.s3.*)
+        # Pass variables back to global scope (s3db.*)
         #
         return Storage()
 
@@ -433,7 +433,7 @@ class S3ScenarioTaskModel(S3Model):
         table = self.define_table(tablename,
                                   scenario_id(),
                                   task_id(),
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         s3.crud_strings[tablename] = Storage(
             title_create = T("Add Task"),
@@ -451,7 +451,7 @@ class S3ScenarioTaskModel(S3Model):
             msg_list_empty = T("No Tasks currently registered in this scenario"))
 
         # ---------------------------------------------------------------------
-        # Pass variables back to global scope (response.s3.*)
+        # Pass variables back to global scope (s3db.*)
         #
         return Storage()
 

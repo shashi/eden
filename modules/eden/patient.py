@@ -85,17 +85,17 @@ class S3PatientModel(S3Model):
                                   Field("treatment_date", "date",
                                         label=T("Date of Treatment"),
                                         represent = s3_date_represent,
-                                        requires = IS_NULL_OR(IS_DATE(format = s3_date_format)),
+                                        requires = IS_NULL_OR(IS_DATE(format=s3_date_format)),
                                         widget = S3DateWidget()
                                         ),
                                   Field("return_date", "date",
                                         label=T("Expected Return Home"),
                                         represent = s3_date_represent,
-                                        requires = IS_NULL_OR(IS_DATE(format = s3_date_format)),
+                                        requires = IS_NULL_OR(IS_DATE(format=s3_date_format)),
                                         widget = S3DateWidget()
                                        ),
-                                  s3.comments(),
-                                  *s3.meta_fields())
+                                  s3_comments(),
+                                  *s3_meta_fields())
 
         # CRUD strings
         ADD_PATIENT = T("New Patient")
@@ -144,8 +144,8 @@ class S3PatientModel(S3Model):
                                             requires=IS_ADD_PERSON_WIDGET(),
                                             label=T("Accompanying Relative"),
                                             comment=None),
-                                  s3.comments(),
-                                  *s3.meta_fields())
+                                  s3_comments(),
+                                  *s3_meta_fields())
 
         # CRUD strings
         ADD_RELATIVE = T("New Relative")
@@ -184,8 +184,8 @@ class S3PatientModel(S3Model):
                                   Field("phone",
                                         requires=IS_NULL_OR(s3_phone_requires),
                                         label=T("Home Phone Number")),
-                                  s3.comments(),
-                                  *s3.meta_fields())
+                                  s3_comments(),
+                                  *s3_meta_fields())
 
         # CRUD strings
         ADD_HOME = T("New Home")
@@ -205,7 +205,7 @@ class S3PatientModel(S3Model):
             msg_list_empty = T("No Homes currently registered"))
 
         # ---------------------------------------------------------------------
-        # Pass variables back to global scope (response.s3.*)
+        # Pass variables back to global scope (s3db.*)
         #
         return Storage()
 

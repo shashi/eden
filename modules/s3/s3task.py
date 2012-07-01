@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
-"""
-    Asynchronous Task Execution
+""" Asynchronous Task Execution
     - falls back to Synchronous if no workers are alive
 
     Worker nodes won't run on Win32 yet.
@@ -46,9 +45,16 @@ __all__ = ["S3Task"]
 
 import datetime
 
-from gluon import HTTP, current
+try:
+    import json # try stdlib (Python 2.6)
+except ImportError:
+    try:
+        import simplejson as json # try external module
+    except:
+        import gluon.contrib.simplejson as json # fallback to pure-Python module
+
+from gluon import current, HTTP
 from gluon.storage import Storage
-import gluon.contrib.simplejson as json
 
 from s3widgets import S3TimeIntervalWidget
 from s3validators import IS_TIME_INTERVAL_WIDGET

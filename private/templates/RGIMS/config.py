@@ -10,11 +10,14 @@ T = current.T
     Template settings for RGIMS
 """
 
-settings.base.system_name = T("Relief Goods Inventory & Monitoring System")
-settings.base.system_name_short = T("RGIMS")
+settings.base.system_name = "Relief Goods Inventory & Monitoring System"
+settings.base.system_name_short = "RGIMS"
 
 # Pre-Populate
 settings.base.prepopulate = ["RGIMS"]
+
+# Theme
+settings.base.theme = "RGIMS"
 
 # Uncomment to Hide the language toolbar
 settings.L10n.display_toolbar = False
@@ -34,7 +37,7 @@ settings.fin.currencies = {
 settings.fin.currency_default = "PHP"
 
 # Security Policy
-settings.security.policy = 5 # Table ACLs
+settings.security.policy = 6 # Warehouse-specific restrictions
 settings.security.map = True
 
 # Enable this for a UN-style deployment
@@ -53,7 +56,7 @@ settings.req.req_type = ["Stock"]
 
 # Inventory Management
 settings.inv.send_form_name = "Tally Out Sheet"
-settings.inv.send_short_name = "TO"
+settings.inv.send_short_name = "TOS"
 settings.inv.send_ref_field_name = "Tally Out Number"
 settings.inv.recv_form_name = "Acknowledgement Receipt for Donations Received Form"
 settings.inv.recv_shortname = "ARDR"
@@ -153,7 +156,7 @@ settings.modules = OrderedDict([
             module_type = None, # Not displayed
         )),
     ("inv", Storage(
-            name_nice = T("Warehouse"),
+            name_nice = T("Warehouses"),
             #description = "Receiving and Sending Items",
             restricted = True,
             module_type = 1

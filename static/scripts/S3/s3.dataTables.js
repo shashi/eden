@@ -8,12 +8,15 @@ $(document).ready(function() {
     /* dataTables handling */
     // Create an array for the column settings (this is required, otherwise the column widths don't autosize)
     if (S3.dataTables.id) {
-        var myList = document.getElementById(S3.dataTables.id);
+        //var myList = document.getElementById(S3.dataTables.id);
+        var myList = $("#" + S3.dataTables.id);
     } else {
-        var myList = document.getElementById('list');
+	//var myList = document.getElementById("list");
+        var myList = $("#list");
     }
     if (myList != null) {
-        var ColumnCount = myList.getElementsByTagName('th').length;
+        //var ColumnCount = myList.getElementsByTagName('th').length;
+        var ColumnCount = myList.find("tbody tr").first().children().length;
     } else {
         var ColumnCount = 0;
     }
@@ -21,7 +24,10 @@ $(document).ready(function() {
     if (S3.dataTables.Actions) {
         var actionCallBacks = new Array();
         var currentID;
-        ColumnSettings[0] = { 'sTitle': ' ', 'bSortable': false  }
+        ColumnSettings[0] = {
+            'sTitle': ' ',
+            'bSortable': false
+        }
     } else {
         ColumnSettings[0] = null;
     }
@@ -43,15 +49,15 @@ $(document).ready(function() {
         var sAjaxSource = null;
         function fnDataTablesPipeline ( url, data, callback ) {
             $.ajax( {
-                "url": url,
-                "data": data,
-                "success": callback,
-                "dataType": "json",
-                "cache": false,
-                "error": function (xhr, error, thrown) {
-                    if ( error == "parsererror" ) {
-                        alert( "DataTables warning: JSON data from server could not be parsed. "+
-                            "This is caused by a JSON formatting error." );
+                'url': url,
+                'data': data,
+                'success': callback,
+                'dataType': "json",
+                'cache': false,
+                'error': function (xhr, error, thrown) {
+                    if (error == 'parsererror') {
+                        alert('DataTables warning: JSON data from server could not be parsed. '+
+                            'This is caused by a JSON formatting error.');
                     }
                 }
             } );

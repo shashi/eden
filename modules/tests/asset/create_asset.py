@@ -47,11 +47,11 @@ class CreateAsset(SeleniumUnitTest):
         now_1_week = (datetime.date.today() + relativedelta( weeks = +1 )).strftime("%Y-%m-%d %H:%M:%S")
         
         # Login, if not-already done so
-        self.login(account="normal", nexturl="asset/asset/create")
+        self.login(account="admin", nexturl="asset/asset/create")
         
         self.create("asset_asset", 
                     [( "number",
-                       "WS-100-17"),
+                       "WS_100_17"),
                      ( "item_id",
                        "Blankets",
                        "autocomplete"),
@@ -62,10 +62,9 @@ class CreateAsset(SeleniumUnitTest):
                      ( "purchase_date",
                        today ),
                      ( "purchase_price",
-                       "8.50"),
+                       8),
                      ( "purchase_currency",
-                       "USD",
-                       "option"),
+                       "USD"),
                      ( "comments",
                        "Test Asset")]
                      )
@@ -84,8 +83,6 @@ class CreateAsset(SeleniumUnitTest):
                        "Lori",
                        "option",
                        3),
-                     #( "room_id",
-                     #  "-"),
                      ( "cond",
                        "Good Condition",
                        "option"),

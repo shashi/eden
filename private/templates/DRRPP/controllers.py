@@ -1,8 +1,19 @@
 # -*- coding: utf-8 -*-
 
-from gluon import *
-#from gluon.storage import Storage
-#from s3 import *
+from os import path
+
+from gluon import current
+from gluon.html import *
+
+# =============================================================================
+def INPUT_BTN(**attributes):
+    """
+        Utility function to create a styled button
+    """
+
+    return SPAN(INPUT(_class = "button-right",
+                      **attributes), 
+                _class = "button-left")
 
 # =============================================================================
 class index():
@@ -12,10 +23,18 @@ class index():
 
         T = current.T
         request = current.request
-        response = current.response
         appname = request.application
+        response = current.response
 
-        response.view = "../private/templates/%s/views/index.html"  % response.s3.theme
+        response.title = current.deployment_settings.get_system_name()
+        view = path.join(request.folder, "private", "templates",
+                         "DRRPP", "views", "index.html")
+        try:
+            # Pass view as file not str to work in compiled mode
+            response.view = open(view, "rb")
+        except IOError:
+            from gluon.http import HTTP
+            raise HTTP("404", "Unable to open Custom View: %s" % view)
 
         home_img = IMG(_src="/%s/static/themes/DRRPP/img/home_img.jpg" % appname,
                        _id="home_img")
@@ -203,11 +222,10 @@ class index():
         _table_user.language.represent = lambda opt: \
             languages.get(opt, current.messages.UNKNOWN_OPT)  
 
-        request.args[0] = "login"
+        request.args = ["login"]
         login = auth()
-        #login[0][-1][0][1][0][0] = INPUT_BTN(_type = "submit",
-        #                                     _value = T("Login")
-        #                                    )
+        login[0][-1][1][0] = INPUT_BTN(_type = "submit",
+                                      _value = T("Login"))
 
         return dict(title = T("Home"),
                     home_img = home_img,                

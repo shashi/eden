@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
-"""
-    Resource PDF Tools
+""" Resource PDF Tools
 
     @see: U{B{I{S3XRC}} <http://eden.sahanafoundation.org/wiki/S3XRC>}
 
@@ -47,7 +46,6 @@ import re
 import os
 import sys
 import math
-import json
 import subprocess
 import unicodedata
 from copy import deepcopy
@@ -61,6 +59,14 @@ from datetime import datetime, timedelta, date
 #from lxml.html.soupparser import unescape
 from htmlentitydefs import name2codepoint
 
+try:
+    import json # try stdlib (Python 2.6)
+except ImportError:
+    try:
+        import simplejson as json # try external module
+    except:
+        import gluon.contrib.simplejson as json # fallback to pure-Python module
+
 from gluon import *
 from gluon.storage import Storage
 from gluon.contenttype import contenttype
@@ -73,7 +79,7 @@ except ImportError:
     raise
 
 from s3method import S3Method
-from s3tools import S3DateTime
+from s3utils import S3DateTime
 
 try:
     from PIL import Image
@@ -448,7 +454,7 @@ class S3PDF(S3Method):
                             linkfield = link[1]
                             break
                     if linkfield != None:
-                        query = ctable[linkfield] == self.record
+                        query = ctable[linkfield] == self.record_id
                         records = db(query).select()
                         find_fields = []
                         for component in self.resource.components.values():

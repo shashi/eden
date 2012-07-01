@@ -116,8 +116,8 @@ class S3EventModel(S3Model):
                                   Field("closed", "boolean",
                                         default = False,
                                         label=T("Closed")),
-                                  s3.comments(),
-                                  *s3.meta_fields())
+                                  s3_comments(),
+                                  *s3_meta_fields())
 
         # CRUD strings
         ADD_EVENT = T("New Event")
@@ -245,7 +245,7 @@ class S3EventModel(S3Model):
                                   Field("name", notnull=True,
                                         length=64,
                                         label=T("Name")),
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         s3.crud_strings[tablename] = Storage(
             title_create = T("Add Incident"),
@@ -283,7 +283,7 @@ class S3EventModel(S3Model):
 
 
         # ---------------------------------------------------------------------
-        # Pass variables back to global scope (response.s3.*)
+        # Pass variables back to global scope (s3db.*)
         #
         return Storage(
                 event_event_id = event_id,
@@ -547,7 +547,7 @@ class S3EventAssetModel(S3Model):
                                   # @ToDo: Move this down to the incident level
                                   #incident_id(),
                                   asset_id(),
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         s3.crud_strings[tablename] = Storage(
             title_create = T("Assign Asset"),
@@ -565,7 +565,7 @@ class S3EventAssetModel(S3Model):
             msg_list_empty = T("No Assets currently registered in this event"))
 
         # ---------------------------------------------------------------------
-        # Pass variables back to global scope (response.s3.*)
+        # Pass variables back to global scope (s3db.*)
         #
         return Storage()
 
@@ -596,7 +596,7 @@ class S3EventHRModel(S3Model):
                                   # @ToDo: Move this down to the incident level
                                   #incident_id(),
                                   human_resource_id(),
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         s3.crud_strings[tablename] = Storage(
             title_create = T("Assign Human Resource"),
@@ -614,7 +614,7 @@ class S3EventHRModel(S3Model):
             msg_list_empty = T("No Human Resources currently assigned to this event"))
 
         # ---------------------------------------------------------------------
-        # Pass variables back to global scope (response.s3.*)
+        # Pass variables back to global scope (s3db.*)
         #
         return Storage()
 
@@ -645,7 +645,7 @@ class S3EventIReportModel(S3Model):
                                   # @ToDo: Move this down to the incident level
                                   #incident_id(),
                                   ireport_id(),
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         s3.crud_strings[tablename] = Storage(
             title_create = T("Add Incident Report"),
@@ -663,7 +663,7 @@ class S3EventIReportModel(S3Model):
             msg_list_empty = T("No Incident Reports currently registered in this event"))
 
         # ---------------------------------------------------------------------
-        # Pass variables back to global scope (response.s3.*)
+        # Pass variables back to global scope (s3db.*)
         #
         return Storage()
 
@@ -691,7 +691,7 @@ class S3EventMapModel(S3Model):
                                   # @ToDo: Move this down to the incident level
                                   #incident_id(),
                                   config_id(),
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         s3.crud_strings[tablename] = Storage(
             title_create = T("Add Map Configuration"),
@@ -709,7 +709,7 @@ class S3EventMapModel(S3Model):
             msg_list_empty = T("No Map Configurations currently registered in this event"))
 
         # ---------------------------------------------------------------------
-        # Pass variables back to global scope (response.s3.*)
+        # Pass variables back to global scope (s3db.*)
         #
         return Storage()
 
@@ -738,7 +738,7 @@ class S3EventSiteModel(S3Model):
                                   # @ToDo: Move this down to the incident level
                                   #incident_id(),
                                   site_id,
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         table.site_id.readable = table.site_id.writable = True
 
@@ -758,7 +758,7 @@ class S3EventSiteModel(S3Model):
             msg_list_empty = T("No Facilities currently registered in this event"))
 
         # ---------------------------------------------------------------------
-        # Pass variables back to global scope (response.s3.*)
+        # Pass variables back to global scope (s3db.*)
         #
         return Storage()
 
@@ -794,7 +794,7 @@ class S3EventTaskModel(S3Model):
                                   # @ToDo: Move this down to the incident level
                                   #incident_id(),
                                   task_id(),
-                                  *s3.meta_fields())
+                                  *s3_meta_fields())
 
         s3.crud_strings[tablename] = Storage(
             title_create = T("Add Task"),
@@ -812,7 +812,7 @@ class S3EventTaskModel(S3Model):
             msg_list_empty = T("No Tasks currently registered in this event"))
 
         # ---------------------------------------------------------------------
-        # Pass variables back to global scope (response.s3.*)
+        # Pass variables back to global scope (s3db.*)
         #
         return Storage()
 

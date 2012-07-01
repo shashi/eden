@@ -45,7 +45,6 @@ def cap_postp(r, output):
 
 # =============================================================================
 def alert():
-
     response.s3.postp = cap_postp
     response.s3.scripts.append("/%s/static/scripts/S3/s3.cap.js" % request.application)
     response.s3.stylesheets.append("S3/cap.css")

@@ -43,7 +43,7 @@ class CreateOffice(SeleniumUnitTest):
         # Configuration
         tablename = "org_office"
         url = "org/office/create"
-        account = "normal"
+        account = "admin"
         data = [
     [
         # 1st field used to check whether record already exists
@@ -53,10 +53,10 @@ class CreateOffice(SeleniumUnitTest):
         ("code",
          "12345678",
         ),
-        ("organisation_id",
-         "Romanian Food Assistance Association",
-         "autocomplete",
-        ),
+#        ("organisation_id",
+#         "Romanian Food Assistance Association",
+#         "autocomplete",
+#        ),
         ("type",
          "Headquarters",
          "option",
@@ -70,10 +70,6 @@ class CreateOffice(SeleniumUnitTest):
         ),
         ("street",
          "102 Diminescu St",
-         "gis_location"
-        ),
-        ("L3",
-         "Bucharest",
          "gis_location"
         ),
     ],

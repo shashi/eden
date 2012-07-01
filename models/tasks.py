@@ -47,7 +47,7 @@ if settings.has_module("msg"):
     tasks["process_outbox"] = process_outbox
 
     # -------------------------------------------------------------------------
-    def process_inbound_email(username):
+    def process_inbound_email(username, user_id):
         """
             Poll an inbound email source.
 
@@ -61,12 +61,12 @@ if settings.has_module("msg"):
     tasks["process_inbound_email"] = process_inbound_email
 
     # -----------------------------------------------------------------------------
-    def parse_workflow(workflow):
+    def parse_workflow(workflow, source, user_id):
         """
         Processes the msg_log for unparsed messages.
         """
         # Run the Task
-        result = msg.parse_import(workflow)
+        result = msg.parse_import(workflow, source)
         return result
         
     tasks["parse_workflow"] = parse_workflow
@@ -113,5 +113,12 @@ tasks["sync_synchronize"] = sync_synchronize
 s3.tasks = tasks
 s3task = s3base.S3Task()
 current.s3task = s3task
+
+# -----------------------------------------------------------------------------
+# Reusable field for scheduler task links
+scheduler_task_id = S3ReusableField("scheduler_task_id",
+                                    "reference %s" % s3base.S3Task.TASK_TABLENAME,
+                                    ondelete="CASCADE")
+s3.scheduler_task_id = scheduler_task_id
 
 # END =========================================================================

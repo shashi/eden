@@ -7,24 +7,26 @@
 module = request.controller
 resourcename = request.function
 
-if not deployment_settings.has_module(module):
+if not settings.has_module(module):
     raise HTTP(404, body="Module disabled: %s" % module)
 
-mode_task = deployment_settings.get_project_mode_task()
+mode_task = settings.get_project_mode_task()
 
 # =============================================================================
 def index():
     """ Module's Home Page """
 
-    # Bypass home page & go direct to searching for Projects
-    if deployment_settings.get_project_mode_drr():
-        redirect(URL(f="project", args="search"))
-    elif mode_task:
+    if mode_task:
         redirect(URL(f="project", vars={"tasks":1}))
+    elif settings.get_project_mode_drr():
+        # Bypass home page & go direct to searching for Projects
+        redirect(URL(f="project", args="search"))
     else:
+        # Bypass home page & go direct to list of Projects
+        # - no good search options available
         redirect(URL(f="project"))
 
-    #module_name = deployment_settings.modules[module].name_nice
+    #module_name = settings.modules[module].name_nice
     #response.title = module_name
     #return dict(module_name=module_name)
 
@@ -59,7 +61,7 @@ def project():
                                               read_url=read_url,
                                               update_url=update_url)
             return output
-        response.s3.postp = postp
+        s3.postp = postp
         return s3_rest_controller()
 
     table = s3db.hrm_human_resource
@@ -69,17 +71,19 @@ def project():
 
     doc_table = s3db.table("doc_document", None)
     if doc_table is not None:
-        doc_table.organisation_id.readable = False
-        doc_table.person_id.readable = False
-        doc_table.location_id.readable = False
-        doc_table.organisation_id.writable = False
-        doc_table.person_id.writable = False
-        doc_table.location_id.writable = False
+        doc_table.organisation_id.readable = doc_table.organisation_id.writable = False
+        doc_table.person_id.readable = doc_table.person_id.writable = False
+        doc_table.location_id.readable = doc_table.location_id.writable = False
 
     # Pre-process
     def prep(r):
         if r.interactive:
-            if r.component is not None:
+            if not r.component:
+                if not r.id and r.function == "index":
+                    r.method = "search"
+                    # If just a few Projects, then a List is sufficient
+                    #r.method = "list"
+            else:
                 if r.component_name == "organisation":
                     if r.method != "update":
                         host_role = 1
@@ -102,7 +106,7 @@ def project():
                         ltable = s3db.gis_location
                         query = (ltable.id.belongs(countries))
                         countries = db(query).select(ltable.code)
-                        deployment_settings.gis.countries = [c.code for c in countries]
+                        settings.gis.countries = [c.code for c in countries]
                 elif r.component_name == "task":
                     r.component.table.milestone_id.requires = IS_NULL_OR(IS_ONE_OF(db,
                                                                 "project_milestone.id",
@@ -112,7 +116,7 @@ def project():
                                                                 ))
                     if "open" in request.get_vars:
                         # Show only the Open Tasks for this Project
-                        statuses = response.s3.project_task_active_statuses
+                        statuses = s3.project_task_active_statuses
                         filter = (r.component.table.status.belongs(statuses))
                         r.resource.add_component_filter("task", filter)
                 elif r.component_name == "beneficiary":
@@ -128,22 +132,23 @@ def project():
                     from eden.hrm import hrm_human_resource_represent
 
                     # We can pass the human resource type filter in the URL
-                    group = r.vars.get('group', None)
+                    group = r.vars.get("group", None)
 
                     # These values are defined in hrm_type_opts
                     if group:
+                        crud_strings = s3.crud_strings
                         if group == "staff":
                             group = 1
                             db.project_human_resource.human_resource_id.label = T("Staff")
-                            s3.crud_strings["project_human_resource"] = s3.crud_strings["hrm_staff"]
-                            s3.crud_strings["project_human_resource"].update(
+                            crud_strings["project_human_resource"] = crud_strings["hrm_staff"]
+                            crud_strings["project_human_resource"].update(
                                 subtitle_create = T("Add Staff Member to Project")
                                 )
                         elif group == "volunteer":
                             group = 2
                             db.project_human_resource.human_resource_id.label = T("Volunteer")
-                            s3.crud_strings["project_human_resource"] = s3.crud_strings["hrm_volunteer"]
-                            s3.crud_strings["project_human_resource"].update(
+                            crud_strings["project_human_resource"] = crud_strings["hrm_volunteer"]
+                            crud_strings["project_human_resource"].update(
                                 subtitle_create = T("Add Volunteer to Project")
                                 )
 
@@ -162,74 +167,28 @@ def project():
                             sort=True
                         )
 
-            elif not r.id and r.function == "index":
-                r.method = "search"
-                # If just a few Projects, then a List is sufficient
-                #r.method = "list"
-
         return True
-    response.s3.prep = prep
+    s3.prep = prep
 
     # Post-process
     def postp(r, output):
         if r.interactive:
             if not r.component:
-                # Do extra client-side validation
-                # This part needs to be able to support multiple L10n_date_format
-                #var datePattern = /^(19|20)\d\d([-\/.])(0[1-9]|1[012])\2(0[1-9]|[12][0-9]|3[01])$/;
-                #if ( (start_date && !(datePattern.test(start_date))) | (end_date && !(datePattern.test(end_date))) ) {
-                #    error_msg = '%s';
-                #    jQuery('#project_project_start_date__row > td').last().text(error_msg);
-                #    jQuery('#project_project_start_date__row > td').last().addClass('red');
-                #    return false;
-                #}
-                validate = True
-                date_format = deployment_settings.get_L10n_date_format()
-                if date_format == T("%Y-%m-%d"):
-                    # Default
-                    start_date_string = "start_date[0], start_date[1], start_date[2]"
-                    end_date_string = "end_date[0], end_date[1], end_date[2]"
-                elif date_format == T("%m-%d-%Y"):
-                    # US Style
-                    start_date_string = "start_date[2], start_date[0], start_date[1]"
-                    end_date_string = "end_date[2], end_date[0], end_date[1]"
-                elif date_format == T("%d-%b-%Y"):
-                    # Unsortable 'Pretty' style
-                    start_date_string = "start_date[0] + ' ' + start_date[1] + ' ' + start_date[2]"
-                    end_date_string = "end_date[0] + ' ' + end_date[1] + ' ' + end_date[2]"
-                else:
-                    # Unknown format - don't add extra validation
-                    validate = False
-                if validate:
-                    script = """$('.form-container > form').submit(function () {
-    var start_date = this.start_date.value;
-    var end_date = this.end_date.value;
-    start_date = start_date.split('-');
-    start_date = new Date(%s);
-    end_date = end_date.split('-');
-    end_date = new Date(%s);
-    if (start_date > end_date) {
-        var error_msg = '%s';
-        jQuery('#project_project_end_date__row > td').last().text(error_msg);
-        jQuery('#project_project_end_date__row > td').last().addClass('red');
-        return false;
-    } else {
-        return true;
-    }
-});""" % (start_date_string,
-          end_date_string,
-          T("End date should be after start date"))
-                if validate:
-                    response.s3.jquery_ready.append(script)
-
+                # Set the minimum end_date to the same as the start_date
+                s3.jquery_ready.append(
+    '''S3.start_end_date('project_project_start_date','project_project_end_date')''')
                 if mode_task:
                     read_url = URL(args=["[id]", "task"])
                     update_url = URL(args=["[id]", "task"])
                     s3mgr.crud.action_buttons(r,
                                               read_url=read_url,
                                               update_url=update_url)
+            elif r.component_name == "beneficiary":
+                    # Set the minimum end_date to the same as the start_date
+                    s3.jquery_ready.append(
+'''S3.start_end_date('project_beneficiary_start_date','project_beneficiary_end_date')''')
         return output
-    response.s3.postp = postp
+    s3.postp = postp
 
     rheader = s3db.project_rheader
     return s3_rest_controller(module,
@@ -259,7 +218,7 @@ def framework():
 def organisation():
     """ RESTful CRUD controller """
 
-    if deployment_settings.get_project_multiple_organsiations():
+    if settings.get_project_multiple_organisations():
         s3mgr.configure("project_organisation",
                         insertable=False,
                         editable=False,
@@ -333,7 +292,7 @@ def activity():
                     doc_table.location_id.writable = False
 
         return True
-    response.s3.prep = prep
+    s3.prep = prep
 
     # Pre-process
     def postp(r, output):
@@ -358,7 +317,7 @@ def activity():
                 item.append(TR(TD(hierarchy[field]), TD(record[field])))
             output["item"] = item
         return output
-    response.s3.postp = postp
+    s3.postp = postp
 
     return s3_rest_controller(rheader=s3db.project_rheader,
                               csv_template="activity")
@@ -386,7 +345,7 @@ def location():
                     doc_table.location_id.writable = False
 
         return True
-    response.s3.prep = prep
+    s3.prep = prep
 
     # Pre-process
     def postp(r, output):
@@ -449,7 +408,7 @@ def location():
                     )
             
         return output
-    response.s3.postp = postp
+    s3.postp = postp
 
     return s3_rest_controller(interactive_report=True,
                               rheader=s3db.project_rheader,
@@ -489,7 +448,7 @@ def task_project():
         if r.method != "options":
             return False
         return True
-    response.s3.prep = prep
+    s3.prep = prep
 
     return s3_rest_controller()
 
@@ -505,7 +464,7 @@ def task_activity():
         if r.method != "options":
             return False
         return True
-    response.s3.prep = prep
+    s3.prep = prep
 
     return s3_rest_controller()
 
@@ -529,7 +488,7 @@ def time():
                         listadd=False)
         person_id = auth.s3_logged_in_person()
         if person_id:
-            response.s3.filter = (table.person_id == person_id)
+            s3.filter = (table.person_id == person_id)
         try:
             list_fields = s3mgr.model.get_config(tablename,
                                                  "list_fields")
@@ -542,7 +501,7 @@ def time():
     elif "week" in request.get_vars:
         now = request.utcnow
         week = datetime.timedelta(days=7)
-        response.s3.filter = (table.date > (now - week))
+        s3.filter = (table.date > (now - week))
 
     return s3_rest_controller()
 
@@ -576,8 +535,8 @@ def comment_parse(comment, comments, task_id=None):
             user = row[utable._tablename]
             username = s3_fullname(person)
             email = user.email.strip().lower()
-            import md5
-            hash = md5.new(email).hexdigest()
+            import hashlib
+            hash = hashlib.md5(email).hexdigest()
             url = "http://www.gravatar.com/%s" % hash
             author = B(A(username, _href=url, _target="top"))
     if not task_id and comment.task_id:
@@ -587,7 +546,7 @@ def comment_parse(comment, comments, task_id=None):
         task_id = comment.task_id
     else:
         header = author
-    thread = LI(DIV(s3_avatar_represent(comment.created_by),
+    thread = LI(DIV(s3base.s3_avatar_represent(comment.created_by),
                     DIV(DIV(header,
                             _class="comment-header"),
                         DIV(XML(comment.body)),
@@ -676,7 +635,7 @@ $('#submit_record__row input').click(function(){$('#comment-form').hide();$('#pr
 """))
 
     # No layout in this output!
-    #response.s3.jquery_ready.append(script)
+    #s3.jquery_ready.append(script)
 
     output = DIV(output,
                  DIV(H4(T("New Post"),

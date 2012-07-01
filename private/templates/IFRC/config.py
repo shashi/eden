@@ -18,6 +18,12 @@ settings.base.system_name_short = T("Resource Management System")
 
 # Theme (folder to use for views/layout.html)
 settings.base.theme = "IFRC"
+settings.gis.map_height = 600
+settings.gis.map_width = 854
+
+# Security Policy
+settings.security.policy = 8 # Delegations
+settings.security.map = True
 
 # L10n settings
 settings.L10n.languages = OrderedDict([
@@ -50,14 +56,6 @@ settings.fin.currencies = {
     "USD" : T("United States Dollars"),
 }
 
-# Security Policy
-settings.security.policy = 8 # Delegations
-settings.security.map = True
-
-# Theme
-settings.gis.map_height = 600
-settings.gis.map_width = 854
-
 # Display Resources recorded to Admin-Level Locations on the map
 # @ToDo: Move into gis_config?
 settings.gis.display_L0 = True
@@ -78,8 +76,16 @@ settings.org.site_code_len = 3
 # Human Resource Management
 # Uncomment to allow Staff & Volunteers to be registered without an email address
 settings.hrm.email_required = False
-# Uncomment to use an alternate table for HR experience
-settings.hrm.experience = "programme"
+# Uncomment to show the Organisation name in HR represents
+settings.hrm.show_organisation = True
+# Uncomment to disable Staff experience
+settings.hrm.staff_experience = False
+# Uncomment to disable the use of HR Credentials
+settings.hrm.use_credentials = False
+# Uncomment to enable the use of HR Education
+settings.hrm.use_education = True
+# Uncomment to disable the use of HR Teams
+settings.hrm.use_teams = False
 
 # Projects
 # Uncomment this to use settings suitable for a global/regional organisation (e.g. DRR)
@@ -108,7 +114,7 @@ settings.save_search.widget = False
 settings.modules = OrderedDict([
     # Core modules which shouldn't be disabled
     ("default", Storage(
-            name_nice = T("Home"),
+            name_nice = "RMS",
             restricted = False, # Use ACLs to control access to this module
             access = None,      # All Users (inc Anonymous) can see this module in the default menu & access the controller
             module_type = None  # This item is not shown in the menu
@@ -198,7 +204,7 @@ settings.modules = OrderedDict([
             module_type = None, # Not displayed
         )),
     ("inv", Storage(
-            name_nice = T("Warehouse"),
+            name_nice = T("Warehouses"),
             #description = "Receiving and Sending Items",
             restricted = True,
             module_type = 4
@@ -222,7 +228,7 @@ settings.modules = OrderedDict([
             module_type = 2
         )),
     ("survey", Storage(
-            name_nice = T("Surveys"),
+            name_nice = T("Assessments"),
             #description = "Create, enter, and manage surveys.",
             restricted = True,
             module_type = 5,
