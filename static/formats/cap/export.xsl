@@ -195,7 +195,7 @@
 
             <scope><xsl:value-of select="data[@field='scope']"/></scope>
 
-            <xsl:if test="data[@field='restriction']!=''">
+            <xsl:if test="data[@field='scope']='Restricted'">
                 <restriction><xsl:value-of select="data[@field='restriction']"/></restriction>
             </xsl:if>
 
