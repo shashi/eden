@@ -21,7 +21,13 @@ def index():
 # -----------------------------------------------------------------------------
 def alert():
     """ REST controller for CAP alerts """
+    def prep(r):
+        if len(r.resource._ids) == 1 and \
+            s3db.cap_alert_is_template(r.resource._ids[0]):
+            redirect(URL(c="cap", f="template", args=request.args, vars=request.vars))
+        return True
 
+    s3.prep = prep
     s3.postp = cap_postp
     s3.scripts.append("/%s/static/scripts/S3/s3.cap.js" % appname)
     s3.stylesheets.append("S3/cap.css")

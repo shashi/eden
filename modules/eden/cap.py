@@ -28,6 +28,7 @@
 """
 
 __all__ = ["S3CAPModel",
+           "cap_alert_is_template",
            "cap_alert_rheader",
            "cap_alert_controller",
            "cap_template_rheader",
@@ -948,21 +949,21 @@ class S3CAPModel(S3Model):
         #XXX: Should get headline from "info"?
         return "%s - %s" % (r.language, r.headline)
 
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def is_template(alert_id):
-        """
-            Tell whether an alert entry is a template
-        """
-        if not alert_id:
-            return False
 
-        table = current.s3db.cap_alert
-        query = (table.id == alert_id)
-        r = current.db(query).select(table.is_template,
-                                     limitby=(0, 1)).first()
+# =============================================================================
+def cap_alert_is_template(alert_id):
+    """
+        Tell whether an alert entry is a template
+    """
+    if not alert_id:
+        return False
 
-        return r.is_template
+    table = current.s3db.cap_alert
+    query = (table.id == alert_id)
+    r = current.db(query).select(table.is_template,
+                                 limitby=(0, 1)).first()
+
+    return r.is_template
 
 # =============================================================================
 def cap_alert_rheader(r):
@@ -1062,7 +1063,7 @@ def cap_info_rheader(r):
 
             table = r.table
 
-            if S3CAPModel.is_template(item.alert_id):
+            if cap_alert_is_template(item.alert_id):
                 rheader = DIV(TABLE(TR(TH("%s: " % T("Alert template")),
                                        A(S3CAPModel.template_represent(item.alert_id),
                                          _href=URL(c="cap", f="template",
@@ -1123,8 +1124,6 @@ def cap_alert_controller():
             add_submit_button(form, "add_info", T("Save and add information..."))
 
         if tablename == 'cap_info':
-            add_submit_button(form, "add_resource", T("Save and attach a file..."), "")
-            add_submit_button(form, "add_area", T("Save and add area..."))
             add_submit_button(form, "add_language", T("Save and add another language..."))
 
     return output
