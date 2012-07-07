@@ -907,7 +907,7 @@ class S3CAPModel(S3Model):
         if r.is_template:
             return r.template_title
         else:
-            return self.alert_represent(id)
+            return S3CAPModel.alert_represent(id)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -1021,8 +1021,8 @@ def cap_template_rheader(r):
                                            limitby=(0, 1)).first()
             error = []
             if not (row and row.id):
-                error.append(DIV(T("An alert needs to contain at least one info item.",
-                                   _class="error")))
+                error.append(DIV(T("An alert needs to contain at least one info item."),
+                                   _class="error"))
 
             tabs = [
                     (T("Edit Alert Template"), None),
@@ -1159,7 +1159,6 @@ def cap_template_controller():
 
     if "form" in output:
         form = output["form"]
-        form[0].update(_class="cap_template_form")
 
         current.response.s3.js_global.append("S3.i18n.cap_editable = '%s';" % T("Editable"))
 
@@ -1167,6 +1166,9 @@ def cap_template_controller():
 
         if tablename == 'cap_alert':
             add_submit_button(form, "add_info", T("Save and add information..."))
+            form[0].update(_class="cap_template_form")
+        if tablename == 'cap_info':
+            form[0].update(_class="cap_info_template_form")
 
     return output
 

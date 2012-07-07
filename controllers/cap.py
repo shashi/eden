@@ -49,6 +49,13 @@ def template():
     #vars["as_template"] = 1
     #redirect(URL(c="cap", f="alert", args=request.args, vars=vars))
     #return True
+    viewing = request.vars['viewing']
+    if viewing:
+        table, id = viewing.strip().split(".")
+        if table == "cap_alert":
+            redirect(URL(c="cap", f="template", args=[id]))
+            return False
+
     s3.postp = cap_postp
     s3.scripts.append("/%s/static/scripts/json2.min.js" % appname)
     s3.scripts.append("/%s/static/scripts/S3/s3.cap.js" % appname)
