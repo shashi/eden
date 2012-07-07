@@ -1,0 +1,14 @@
+#cap_alert_template_settings__row1,
+#cap_alert_template_settings__row,
+#cap_info_template_settings__row1,
+#cap_info_template_settings__row,
+#cap_alert_template_title__row1,
+#cap_alert_template_title__row,
+#cap_alert_is_template__row1,
+#cap_alert_is_template__row
+{display: none}
+
+.cap_template_form #cap_alert_template_title__row1,
+.cap_template_form #cap_alert_template_title__row
+{display: block}
+

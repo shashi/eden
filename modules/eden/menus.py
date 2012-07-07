@@ -1089,7 +1089,7 @@ class S3OptionsMenu(object):
                     M("List All Alerts", f="alert")(
                         M("Create Alert", f="alert", m="create"),
                         M("Create CAP Profile", f="profile", m="create"),
-                        M("Create CAP Template", f="template", m="template"),
+                        M("Create CAP Template", f="template", m="create"),
                         M("Search", m="search"),
                     )
                 )

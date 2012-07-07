@@ -21,7 +21,7 @@ def index():
 # -----------------------------------------------------------------------------
 def alert():
     """ REST controller for CAP alerts """
-    
+
     s3.postp = cap_postp
     s3.scripts.append("/%s/static/scripts/S3/s3.cap.js" % appname)
     s3.stylesheets.append("S3/cap.css")
@@ -35,6 +35,19 @@ def info():
     s3.scripts.append("/%s/static/scripts/S3/s3.cap.js" % appname)
     s3.stylesheets.append("S3/cap.css")
     return s3db.cap_info_controller()
+
+def template():
+    """ REST controller for CAP templates """
+
+    #vars = request.vars
+    #vars["as_template"] = 1
+    #redirect(URL(c="cap", f="alert", args=request.args, vars=vars))
+    #return True
+    s3.postp = cap_postp
+    s3.scripts.append("/%s/static/scripts/json2.min.js" % appname)
+    s3.scripts.append("/%s/static/scripts/S3/s3.cap.js" % appname)
+    s3.stylesheets.append("S3/cap.css")
+    return s3db.cap_template_controller()
 
 # -----------------------------------------------------------------------------
 def cap_postp(r, output):

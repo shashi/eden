@@ -30,6 +30,8 @@
 __all__ = ["S3CAPModel",
            "cap_alert_rheader",
            "cap_alert_controller",
+           "cap_template_rheader",
+           "cap_template_controller",
            "cap_info_rheader",
            "cap_info_controller"]
 
@@ -248,6 +250,11 @@ class S3CAPModel(S3Model):
         tablename = "cap_alert"
         table = define_table(tablename,
                              # identifier string, as was recieved.
+                             Field("is_template", "boolean",
+                                   readable=False,
+                                   writable=True),
+                             Field("template_title"),
+                             Field("template_settings", "text"),
                              Field("identifier", unique=True,
                                    default = self.generate_identifier),
                              Field("sender",
@@ -287,22 +294,25 @@ class S3CAPModel(S3Model):
                                    represent = self.list_string_represent),
                              *s3_meta_fields())
 
-        ADD_ALERT = T("Create Alert")
-        crud_strings[tablename] = Storage(
-            title_create = ADD_ALERT,
-            title_display = T("Alert Details"),
-            title_list = T("Alerts"),
-            title_update = T("Edit Alert"), # If already-published, this should create a new "Update" alert instead of modifying the original
-            title_upload = T("Import Alerts"),
-            title_search = T("Search Alerts"),
-            subtitle_create = T("Create new Alert"),
-            label_list_button = T("List Alerts"),
-            label_create_button = ADD_ALERT,
-            label_delete_button = T("Delete Alert"),
-            msg_record_created = T("Alert created"),
-            msg_record_modified = T("Alert modified"),
-            msg_record_deleted = T("Alert deleted"),
-            msg_list_empty = T("No alerts to show"))
+        if crud_strings["cap_template"]:
+            crud_strings[tablename] = crud_strings["cap_template"]
+        else:
+            ADD_ALERT = T("Create Alert")
+            crud_strings[tablename] = Storage(
+                title_create = ADD_ALERT,
+                title_display = T("Alert Details"),
+                title_list = T("Alerts"),
+                title_update = T("Edit Alert"), # If already-published, this should create a new "Update" alert instead of modifying the original
+                title_upload = T("Import Alerts"),
+                title_search = T("Search Alerts"),
+                subtitle_create = T("Create new Alert"),
+                label_list_button = T("List Alerts"),
+                label_create_button = ADD_ALERT,
+                label_delete_button = T("Delete Alert"),
+                msg_record_created = T("Alert created"),
+                msg_record_modified = T("Alert modified"),
+                msg_record_deleted = T("Alert deleted"),
+                msg_list_empty = T("No alerts to show"))
 
         alert_id = S3ReusableField("alert_id", db.cap_alert,
                                    sortby = "identifier",
@@ -329,7 +339,7 @@ class S3CAPModel(S3Model):
               _title="%s|%s" % (
                   T("The identifier of the sender of the alert message"),
                   T("This is guaranteed by assigner to be unique globally; e.g., may be based on an Internet domain name. Must not include spaces, commas or restricted characters (< and &).")))
-                  
+
         table.status.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
@@ -450,6 +460,10 @@ class S3CAPModel(S3Model):
         tablename = "cap_info"
         table = define_table(tablename,
                              alert_id(),
+                             Field("is_template", "boolean",
+                                   readable=False,
+                                   writable=False),
+                             Field("template_settings", "text"),
                              Field("language",
                                    requires=IS_IN_SET(settings.get_cap_languages()),
                                    default="en"),
@@ -498,24 +512,26 @@ class S3CAPModel(S3Model):
                                     self.list_string_represent(v, lambda i: \
                                         ": ".join(i.split("`", 1)))),
                              *s3_meta_fields())
-
-        ADD_INFO = T("Add alert information")
-        crud_strings[tablename] = Storage(
-            title_create = ADD_INFO,
-            title_display = T("Alert information"),
-            title_list = T("Information entries"),
-            title_update = T("Update alert information"), # this will create a new "Update" alert?
-            title_upload = T("Import alert information"),
-            title_search = T("Search alert information"),
-            subtitle_create = T("Create an information entry"),
-            subtitle_list = T("Listing of alert information items"),
-            label_list_button = T("List information entries"),
-            label_create_button = ADD_INFO,
-            label_delete_button = T("Delete Alert"),
-            msg_record_created = T("Alert information created"),
-            msg_record_modified = T("Alert information modified"),
-            msg_record_deleted = T("Alert information deleted"),
-            msg_list_empty = T("No alert information to show"))
+        if crud_strings["cap_template_info"]:
+            crud_strings[tablename] = crud_strings["cap_template_info"]
+        else:
+            ADD_INFO = T("Add alert information")
+            crud_strings[tablename] = Storage(
+                title_create = ADD_INFO,
+                title_display = T("Alert information"),
+                title_list = T("Information entries"),
+                title_update = T("Update alert information"), # this will create a new "Update" alert?
+                title_upload = T("Import alert information"),
+                title_search = T("Search alert information"),
+                subtitle_create = T("Create an information entry"),
+                subtitle_list = T("Listing of alert information items"),
+                label_list_button = T("List information entries"),
+                label_create_button = ADD_INFO,
+                label_delete_button = T("Delete Alert"),
+                msg_record_created = T("Alert information created"),
+                msg_record_modified = T("Alert information modified"),
+                msg_record_deleted = T("Alert information deleted"),
+                msg_list_empty = T("No alert information to show"))
 
         info_id = S3ReusableField("info_id", db.cap_info,
                                   sortby="identifier",
@@ -871,6 +887,29 @@ class S3CAPModel(S3Model):
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def template_represent(id):
+        """
+            Represent an alert template concisely
+        """
+
+        if not id:
+            return current.messages.NONE
+
+        table = current.s3db.cap_alert
+        query = (table.id == id)
+        r = current.db(query).select(table.is_template,
+                                     table.template_title,
+                                     # left = table.on(table.id == table.parent_item_category_id), Doesn't work
+                                     limitby=(0, 1)).first()
+
+        #XXX: Should get headline from "info"?
+        if r.is_template:
+            return r.template_title
+        else:
+            return self.alert_represent(id)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def list_string_represent(string, fmt=lambda v: v):
         try:
             if isinstance(string, list):
@@ -908,6 +947,22 @@ class S3CAPModel(S3Model):
 
         #XXX: Should get headline from "info"?
         return "%s - %s" % (r.language, r.headline)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def is_template(alert_id):
+        """
+            Tell whether an alert entry is a template
+        """
+        if not alert_id:
+            return False
+
+        table = current.s3db.cap_alert
+        query = (table.id == alert_id)
+        r = current.db(query).select(table.is_template,
+                                     limitby=(0, 1)).first()
+
+        return r.is_template
 
 # =============================================================================
 def cap_alert_rheader(r):
@@ -950,6 +1005,44 @@ def cap_alert_rheader(r):
     return None
 
 # =============================================================================
+def cap_template_rheader(r):
+    """ Resource Header for Alert templates"""
+
+    if r.representation == "html":
+        item = r.record
+        if item:
+
+            T = current.T
+
+            table = current.s3db.cap_info
+            query = (table.alert_id == item.id)
+            row = current.db(query).select(table.id,
+                                           limitby=(0, 1)).first()
+            error = []
+            if not (row and row.id):
+                error.append(DIV(T("An alert needs to contain at least one info item.",
+                                   _class="error")))
+
+            tabs = [
+                    (T("Edit Alert Template"), None),
+                    (T("Edit Info Template"), "info"),
+                    #(T("Edit Area"), "info_area"),
+                    #(T("Resource Files"), "info_resource"),
+                   ]
+
+            rheader_tabs = s3_rheader_tabs(r, tabs)
+
+            rheader = DIV(TABLE(TR( TH("%s: " % T("Alert template")),
+                                    A(S3CAPModel.template_represent(item.id),
+                                      _href=URL(c="cap", f="template", args=[item.id, "update"]))
+                                  )
+                               ),
+                          rheader_tabs,
+                          *error
+                         )
+            return rheader
+    return None
+# =============================================================================
 def cap_info_rheader(r):
     """ Resource Header for Info segments """
 
@@ -969,19 +1062,37 @@ def cap_info_rheader(r):
 
             table = r.table
 
-            rheader = DIV(TABLE(TR(TH("%s: " % T("Alert")),
-                                   A(S3CAPModel.alert_represent(item.alert_id),
-                                     _href=URL(c="cap", f="alert",
-                                               args=[item.alert_id, "update"])),
-                                  ),
-                                TR(TH("%s: " % T("Information")),
-                                   A(S3CAPModel.info_represent(item.id),
-                                     _href=URL(c="cap", f="info",
-                                               args=[item.id, "update"])),
-                                  )
-                               ),
-                          rheader_tabs
-                         )
+            if S3CAPModel.is_template(item.alert_id):
+                rheader = DIV(TABLE(TR(TH("%s: " % T("Alert template")),
+                                       A(S3CAPModel.template_represent(item.alert_id),
+                                         _href=URL(c="cap", f="template",
+                                                   args=[item.alert_id, "update"])),
+                                      ),
+                                    TR(TH("%s: " % T("Info template")),
+                                       A(S3CAPModel.info_represent(item.id),
+                                         _href=URL(c="cap", f="info",
+                                                   args=[item.id, "update"])),
+                                      )
+                                   ),
+                              rheader_tabs,
+                              _class="cap_info_template_form"
+                             )
+                current.response.s3.js_global \
+                    .append("S3.i18n.cap_editable = '%s';" % T("Editable"))
+            else:
+                rheader = DIV(TABLE(TR(TH("%s: " % T("Alert")),
+                                       A(S3CAPModel.alert_represent(item.alert_id),
+                                         _href=URL(c="cap", f="alert",
+                                                   args=[item.alert_id, "update"])),
+                                      ),
+                                    TR(TH("%s: " % T("Information")),
+                                       A(S3CAPModel.info_represent(item.id),
+                                         _href=URL(c="cap", f="info",
+                                                   args=[item.id, "update"])),
+                                      )
+                                   ),
+                              rheader_tabs
+                             )
             return rheader
     return None
 
@@ -1015,6 +1126,48 @@ def cap_alert_controller():
             add_submit_button(form, "add_resource", T("Save and attach a file..."), "")
             add_submit_button(form, "add_area", T("Save and add area..."))
             add_submit_button(form, "add_language", T("Save and add another language..."))
+
+    return output
+
+# =============================================================================
+def cap_template_controller():
+    """ RESTful CRUD controller """
+
+    T = current.T
+    crud_strings = current.response.s3.crud_strings
+
+    # XXX: hack!
+    tablename = "cap_template"
+    ADD_ALERT_TPL = T("Create Alert Template")
+    crud_strings[tablename] = Storage(
+        title_create = ADD_ALERT_TPL,
+        title_display = T("Alert Template"),
+        title_list = T("Alert Templates"),
+        title_update = T("Edit Alert Template"), # If already-published, this should create a new "Update" alert instead of modifying the original
+        title_upload = T("Import Alert Templates"),
+        title_search = T("Search Alert Templates"),
+        subtitle_create = T("Create new Alert Template"),
+        label_list_button = T("List Alert Templates"),
+        label_create_button = ADD_ALERT_TPL,
+        label_delete_button = T("Delete Alert Template"),
+        msg_record_created = T("Alert template created"),
+        msg_record_modified = T("Alert template modified"),
+        msg_record_deleted = T("Alert tempmate deleted"),
+        msg_list_empty = T("No templates to show"))
+
+    output = current.rest_controller("cap", "alert",
+                                     rheader=current.s3db.cap_template_rheader)
+
+    if "form" in output:
+        form = output["form"]
+        form[0].update(_class="cap_template_form")
+
+        current.response.s3.js_global.append("S3.i18n.cap_editable = '%s';" % T("Editable"))
+
+        tablename = form.table._tablename
+
+        if tablename == 'cap_alert':
+            add_submit_button(form, "add_info", T("Save and add information..."))
 
     return output
 
