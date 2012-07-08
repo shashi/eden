@@ -249,11 +249,22 @@ class S3CAPModel(S3Model):
 
         # @ToDo: i18n: Need label=T("")
         tablename = "cap_alert"
+        template_id = S3ReusableField("template_id", "reference:%s" % tablename,
+                                      requires = IS_NULL_OR(
+                                      IS_ONE_OF(db, "cap_alert.id",
+                                                filterby = "(cap_alert.is_template = 'T')",
+                                                label = self.template_represent)),
+                                      represent = self.template_represent,
+                                      label = T("Template"),
+                                      comment = T("Apply a template"),
+                                      ondelete = "RESTRICT")
+
         table = define_table(tablename,
                              # identifier string, as was recieved.
                              Field("is_template", "boolean",
                                    readable=False,
                                    writable=True),
+                             template_id(),
                              Field("template_title"),
                              Field("template_settings", "text"),
                              Field("identifier", unique=True,
@@ -316,7 +327,6 @@ class S3CAPModel(S3Model):
                 msg_list_empty = T("No alerts to show"))
 
         alert_id = S3ReusableField("alert_id", db.cap_alert,
-                                   sortby = "identifier",
                                    requires = IS_NULL_OR(
                                     IS_ONE_OF(db, "cap_alert.id",
                                               label = self.alert_represent)),
@@ -1108,6 +1118,15 @@ def add_submit_button(form, name, value, style="font-weight: bold"):
                       _value=value)))
 
 # =============================================================================
+def alert_form_mods(form):
+    """
+        Alert form mods
+    """
+    #add_submit_button(form, "add_info", T("Save and add information..."))
+    pass
+
+
+# =============================================================================
 def cap_alert_controller():
     """ RESTful CRUD controller """
 
@@ -1122,7 +1141,7 @@ def cap_alert_controller():
         T = current.T
 
         if tablename == 'cap_alert':
-            add_submit_button(form, "add_info", T("Save and add information..."))
+            alert_form_mods(form)
 
         if tablename == 'cap_info':
             add_submit_button(form, "add_language", T("Save and add another language..."))
@@ -1166,10 +1185,9 @@ def cap_template_controller():
         tablename = form.table._tablename
 
         if tablename == 'cap_alert':
-            add_submit_button(form, "add_info", T("Save and add information..."))
-            form[0].update(_class="cap_template_form")
+            form.update(_class="cap_template_form")
         if tablename == 'cap_info':
-            form[0].update(_class="cap_info_template_form")
+            form.update(_class="cap_info_template_form")
 
     return output
 
