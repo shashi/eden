@@ -21,6 +21,8 @@ def index():
 # -----------------------------------------------------------------------------
 def alert():
     """ REST controller for CAP alerts """
+
+    request.vars["alert.is_template"] = 'F'
     def prep(r):
         if len(r.resource._ids) == 1 and \
             s3db.cap_alert_is_template(r.resource._ids[0]):
@@ -49,6 +51,7 @@ def template():
     #vars["as_template"] = 1
     #redirect(URL(c="cap", f="alert", args=request.args, vars=vars))
     #return True
+    request.vars["alert.is_template"] = 'T'
     viewing = request.vars['viewing']
     if viewing:
         table, id = viewing.strip().split(".")

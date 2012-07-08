@@ -1100,6 +1100,7 @@ def cap_info_rheader(r):
 # =============================================================================
 def add_submit_button(form, name, value, style="font-weight: bold"):
     """
+        Append a submit button to a form
     """
 
     form[0][-1][0].insert(1, TAG[""](" ",
