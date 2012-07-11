@@ -76,12 +76,16 @@
             var tablename = get_table($form),
                 fields = get_template_fields(tablename),
                 values, settings = {};
-            if (tablename == 'cap_alert') {
+
+            if (!data) {
+                values = {};
+                settings = {};
+            } else if (tablename == 'cap_alert') {
                 values = data['$_cap_alert'][0];
                 settings = $.parseJSON(values.template_settings) || {};
             } else if (tablename == 'cap_info') {
                 // FIXME: Multiple info :/
-                values = data['$_cap_alert'][0]['$_cap_info'][0];
+                values = data['$_cap_info'][0];
                 settings = $.parseJSON(values.template_settings) || {};
             }
 
@@ -94,7 +98,6 @@
                         switch(typeof(values[f])) {
                         case 'string':
                         case 'undefined':
-                        console.log("GKAKAAKAK", settings.locked);
                             $f.val(values[f] || '');
                             if (settings.locked && settings.locked[f]) {
                                 $f.attr('disabled', true)
@@ -115,11 +118,20 @@
             });
         }
 
-        function apply_template(id) {
+        function apply_alert_template(id, type) {
+            console.log("Applying template " + id);
+            if (id == '' || !id) {
+                load_template_data();
+                return;
+            }
+            if (typeof(type) == 'undefined') {
+                type = "template";
+            }
+
             var re = new RegExp('.*\\' + S3.Ap + '\\/'),
                 _url = new String(self.location),
                 module = _url.replace(re, '').split('?')[0].split('/')[0],
-                url = [S3.Ap, module, "template", id].join("/") + ".s3json";
+                url = [S3.Ap, module, type, id].join("/") + ".s3json";
             console.log(url);
             $.ajax({
                 url: url,
@@ -137,10 +149,14 @@
         }
 
         $form.find('[name=template_id]').change(function () {
-            apply_template($(this).val());
+            apply_alert_template($(this).val());
         });
 
-        window.apply_temp = apply_template;
+        if ($form.find('[name=_formname]').val().substring(0, 8) == 'cap_info') {
+            apply_alert_template($form.find('[name=template_info_id]').val())
+        }
+
+        window.apply_temp = apply_alert_template;
     }
 
     function init_template_form($form) {

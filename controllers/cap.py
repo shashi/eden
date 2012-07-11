@@ -145,6 +145,9 @@ def alert():
                                            'uuid',
                                            'created_on',
                                            'deleted_fk',
+                                           # Don't copy this: make an
+                                           # Ajax call instead
+                                           'template_settings',
                                            'id'
                                           ]
                         for key in unwanted_fields:
