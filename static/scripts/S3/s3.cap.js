@@ -94,14 +94,15 @@
                         switch(typeof(values[f])) {
                         case 'string':
                         case 'undefined':
+                        console.log("GKAKAAKAK", settings.locked);
                             $f.val(values[f] || '');
-                            if (settings.editable && settings.editable[f]) {
-                                $f.attr('disabled', 'disabled')
-                                  .attr('title', '');
-                            } else {
-                                $f.removeAttr('disabled')
+                            if (settings.locked && settings.locked[f]) {
+                                $f.attr('disabled', true)
                                   // TODO: i18n
                                   .attr('title', 'This field is locked by the template');
+                            } else {
+                                $f.removeAttr('disabled')
+                                  .attr('title', '');
                             }
                             break;
                         case 'object':
@@ -166,18 +167,18 @@
         function inheritable_flag(field, $e) {
             var name = 'can_edit-' + field,
                 $label = $('<label for="' + name + '">' +
-                                (S3.i18n.cap_editable || 'Editable') + '</label>'),
+                                (S3.i18n.cap_locked || 'Locked') + '</label>'),
                 $checkbox = $('<input type="checkbox" name="' + name +'"/>');
 
-            $checkbox.click(function () {
+            $checkbox.change(function () {
                 var settings = get_settings();
-                settings.editable = settings.editable || {};
-                settings.editable[field] = $(this).is(':checked');
+                settings.locked = settings.locked || {};
+                settings.locked[field] = $(this).is(':checked');
                 set_settings(settings);
             });
 
             var settings = get_settings();
-            if (settings.editable && settings.editable[field]) {
+            if (settings.locked && settings.locked[field]) {
                 $checkbox.attr('checked', 'checked');
             }
 

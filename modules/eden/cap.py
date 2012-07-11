@@ -28,6 +28,7 @@
 """
 
 __all__ = ["S3CAPModel",
+           "cap_info_labels",
            "cap_alert_is_template",
            "cap_alert_rheader",
            "cap_alert_controller",
@@ -473,6 +474,15 @@ class S3CAPModel(S3Model):
                              Field("is_template", "boolean",
                                    readable=False,
                                    writable=False),
+                             Field("template_info_id", "reference %s" % tablename,
+                                      requires = IS_NULL_OR(
+                                          IS_ONE_OF(db, "%s.id" % tablename,
+                                                    filterby="is_template",
+                                                    filter_opts=(True,),
+                                                    label = self.template_represent)),
+                                      ondelete = "RESTRICT",
+                                      readable=False,
+                                      writable=False),
                              Field("template_settings", "text"),
                              Field("language",
                                    requires=IS_IN_SET(settings.get_cap_languages()),
@@ -522,6 +532,11 @@ class S3CAPModel(S3Model):
                                     self.list_string_represent(v, lambda i: \
                                         ": ".join(i.split("`", 1)))),
                              *s3_meta_fields())
+
+        info_labels = cap_info_labels()
+        for field in info_labels:
+            db.cap_info[field].label = info_labels[field]
+
         if crud_strings["cap_template_info"]:
             crud_strings[tablename] = crud_strings["cap_template_info"]
         else:
@@ -957,6 +972,31 @@ class S3CAPModel(S3Model):
         #XXX: Should get headline from "info"?
         return "%s - %s" % (r.language, r.headline)
 
+# =============================================================================
+def cap_info_labels():
+    T = current.T
+    return dict(
+                language=T("Language"),
+                category=T("Category"),
+                event=T("Event"),
+                response_type=T("Response type"),
+                urgency=T("Urgency"),
+                severity=T("Severity"),
+                certainty=T("Certainty"),
+                audience=T("Audience"),
+                event_code=T("Event code"),
+                effective=T("Effective"),
+                onset=T("Onset"),
+                expires=T("Expires at"),
+                sender_name=T("Sender's name"),
+                headline=T("Headline"),
+                description=T("Description"),
+                instruction=T("Instruction"),
+                web=T("URL"),
+                contact=T("Contact information"),
+                parameter=T("Parameters")
+                )
+
 
 # =============================================================================
 def cap_alert_is_template(alert_id):
@@ -1087,7 +1127,7 @@ def cap_info_rheader(r):
                               _class="cap_info_template_form"
                              )
                 current.response.s3.js_global \
-                    .append("S3.i18n.cap_editable = '%s';" % T("Editable"))
+                    .append("S3.i18n.cap_locked = '%s';" % T("Locked"))
             else:
                 rheader = DIV(TABLE(TR(TH("%s: " % T("Alert")),
                                        A(S3CAPModel.alert_represent(item.alert_id),
@@ -1125,6 +1165,13 @@ def alert_form_mods(form):
     #
     #add_submit_button(form, "add_info", T("Save and add information..."))
     T = current.T
+
+    fields = cap_info_labels()
+    jsobj = []
+    for f in fields:
+        jsobj.append("'%s': '%s'" % (f, fields[f].replace("'", "\\'")))
+
+    current.response.s3.js_global.append("S3.i18n.cap_info_labels = {%s};" % ", ".join(jsobj))
 
     form[0][-1][0][0].update(_value=T("Save and edit information"),
                              _name="edit_info")
@@ -1184,7 +1231,7 @@ def cap_template_controller():
     if "form" in output:
         form = output["form"]
 
-        current.response.s3.js_global.append("S3.i18n.cap_editable = '%s';" % T("Editable"))
+        current.response.s3.js_global.append("S3.i18n.cap_locked = '%s';" % T("Locked"))
 
         tablename = form.table._tablename
 

@@ -10,6 +10,8 @@ resourcename = request.function
 if module not in settings.modules:
     raise HTTP(404, body="Module disabled: %s" % module)
 
+import json
+
 # -----------------------------------------------------------------------------
 def index():
     """ Module's Home Page """
@@ -19,6 +21,34 @@ def index():
     return dict(module_name=module_name)
 
 # -----------------------------------------------------------------------------
+def info_prep(r):
+    template_info_id = None
+
+    if request.post_vars.get("language", False):
+        if (r.tablename == "cap_info"):
+            try:
+                template_info_id = s3db.cap_info(s3db.cap_info.id == request.resource._ids[0]) \
+                                    .template_info_id
+            except KeyError:
+                pass
+        elif (r.component and r.component.tablename == "cap_info"):
+            try:
+                template_info_id = r.component.get_id()
+                # this will error out if component is not yet saved
+            except:
+                pass
+
+    if template_info_id:
+        # read template and copy locked fields to post_vars
+        template = s3db.cap_info(s3db.cap_info.id == template_info_id)
+        settings = json.loads(template.template_settings)
+        if isinstance(settings.get('locked', False), dict):
+            locked_fields = [lf for lf in settings["locked"] if settings["locked"]]
+            for lf in locked_fields:
+                request.post_vars[lf] = template[lf]
+    return True
+
+# -----------------------------------------------------------------------------
 def alert():
     """ REST controller for CAP alerts """
 
@@ -26,6 +56,19 @@ def alert():
         if len(r.resource._ids) == 1 and \
             s3db.cap_alert_is_template(r.resource._ids[0]):
             redirect(URL(c="cap", f="template", args=request.args, vars=request.vars))
+
+        if r.tablename == "cap_alert":
+            if request.post_vars.get("edit_info", False):
+                tid = str(request.post_vars["template_id"])
+                if tid:
+                    # read template and copy locked fields to post_vars
+                    template = s3db.cap_alert(s3db.cap_alert.id == tid)
+                    settings = json.loads(template.template_settings)
+                    if isinstance(settings.get('locked', False), dict):
+                        locked_fields = [lf for lf in settings["locked"] if settings["locked"]]
+                        for lf in locked_fields:
+                            request.post_vars[lf] = template[lf]
+        info_prep(r)
         return True
 
     s3.prep = prep
@@ -69,6 +112,8 @@ def alert():
                                 pass
 
                         row_clone["alert_id"] = alert_id
+                        row_clone["template_info_id"] = row.id
+                        row_clone["is_template"] = False
 
                         current.s3db.cap_info.insert(**row_clone)
 
@@ -110,7 +155,9 @@ def info():
             pass
         return output
 
+    s3.prep = info_prep
     s3.postp = postp
+
     s3.scripts.append("/%s/static/scripts/S3/s3.cap.js" % appname)
     s3.stylesheets.append("S3/cap.css")
     return s3db.cap_info_controller()
