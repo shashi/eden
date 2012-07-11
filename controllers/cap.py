@@ -22,7 +22,6 @@ def index():
 def alert():
     """ REST controller for CAP alerts """
 
-    request.vars["alert.is_template"] = 'F'
     def prep(r):
         if len(r.resource._ids) == 1 and \
             s3db.cap_alert_is_template(r.resource._ids[0]):
@@ -30,7 +29,55 @@ def alert():
         return True
 
     s3.prep = prep
-    s3.postp = cap_postp
+
+    def postp(r, output):
+        """
+            Common REST post-processor:
+             - check to see if "Save and add information" was pressed
+        """
+
+        if r.tablename == "cap_alert":
+            if request.post_vars.get("edit_info", False) and r.resource.lastid:
+                table = current.s3db.cap_alert
+                alert = current.db(table.id == r.resource.lastid) \
+                                .select(table.template_id, limitby=(0, 1)).first()
+
+                if alert:
+                    template_id = alert.template_id
+                    alert_id = r.resource.lastid
+                    template_info = current.db(
+                                        current.s3db.cap_info.alert_id == template_id
+                                    ).select()
+                    for row in template_info:
+                        row_clone = row.as_dict()
+                        unwanted_fields = ['deleted_rb',
+                                           'owned_by_user',
+                                           'approved_by',
+                                           'mci',
+                                           'deleted',
+                                           'modified_on',
+                                           'owned_by_entity',
+                                           'uuid',
+                                           'created_on',
+                                           'deleted_fk',
+                                           'id'
+                                          ]
+                        for key in unwanted_fields:
+                            try:
+                                row_clone.pop(key)
+                            except KeyError:
+                                pass
+
+                        row_clone["alert_id"] = alert_id
+
+                        current.s3db.cap_info.insert(**row_clone)
+
+                r.next = URL(c="cap", f="alert",
+                             args=[r.resource.lastid, "info"])
+        return output
+
+    s3.postp = postp
+
     s3.scripts.append("/%s/static/scripts/S3/s3.cap.js" % appname)
     s3.stylesheets.append("S3/cap.css")
     return s3db.cap_alert_controller()
@@ -39,7 +86,31 @@ def alert():
 def info():
     """ REST controller for CAP info segments """
 
-    s3.postp = cap_postp
+    def postp(r, output):
+        if r.tablename == "cap_info" or \
+           r.component and r.component.tablename == "cap_info":
+            #if request.post_vars.get("add_language", False):
+            #    alert_id = None
+            #    if r.tablename == "cap_info":
+            #        alert_id = r.resource.alert_id
+            #    elif r.tablename == "cap_alert":
+            #        alert_id = r.resource.get_id()
+
+            #    if alert_id:
+            #        r.next = URL(c="cap", f="alert",
+            #                     args=[alert_id, "info/create"])
+
+            #if request.post_vars.get("add_file", False):
+            #    r.next = URL(c="cap", f="info",
+            #                 args=[r.component.lastid, "info_resource"])
+
+            #if request.post_vars.get("add_area", False):
+            #    r.next = URL(c="cap", f="info",
+            #                 args=[r.component.lastid, "info_area"])
+            pass
+        return output
+
+    s3.postp = postp
     s3.scripts.append("/%s/static/scripts/S3/s3.cap.js" % appname)
     s3.stylesheets.append("S3/cap.css")
     return s3db.cap_info_controller()
@@ -51,53 +122,15 @@ def template():
     #vars["as_template"] = 1
     #redirect(URL(c="cap", f="alert", args=request.args, vars=vars))
     #return True
-    request.vars["alert.is_template"] = 'T'
     viewing = request.vars['viewing']
     if viewing:
         table, id = viewing.strip().split(".")
         if table == "cap_alert":
             redirect(URL(c="cap", f="template", args=[id]))
             return False
-
-    s3.postp = cap_postp
     s3.scripts.append("/%s/static/scripts/json2.min.js" % appname)
     s3.scripts.append("/%s/static/scripts/S3/s3.cap.js" % appname)
     s3.stylesheets.append("S3/cap.css")
     return s3db.cap_template_controller()
-
-# -----------------------------------------------------------------------------
-def cap_postp(r, output):
-    """
-        Common REST post-processor:
-         - check to see if "Save and add information" was pressed
-    """
-
-    if r.tablename == "cap_alert":
-        if request.post_vars.get("add_info", False):
-            r.next = URL(c="cap", f="alert",
-                         args=[r.resource.lastid, "info"])
-
-    if r.tablename == "cap_info" or \
-       r.component and r.component.tablename == "cap_info":
-        if request.post_vars.get("add_language", False):
-            alert_id = None
-            if r.tablename == "cap_info":
-                alert_id = r.resource.alert_id
-            elif r.tablename == "cap_alert":
-                alert_id = r.resource.get_id()
-
-            if alert_id:
-                r.next = URL(c="cap", f="alert",
-                             args=[alert_id, "info/create"])
-
-        if request.post_vars.get("add_file", False):
-            r.next = URL(c="cap", f="info",
-                         args=[r.component.lastid, "info_resource"])
-
-        if request.post_vars.get("add_area", False):
-            r.next = URL(c="cap", f="info",
-                         args=[r.component.lastid, "info_area"])
-
-    return output
 
 # END =========================================================================

@@ -249,22 +249,21 @@ class S3CAPModel(S3Model):
 
         # @ToDo: i18n: Need label=T("")
         tablename = "cap_alert"
-        template_id = S3ReusableField("template_id", "reference:%s" % tablename,
-                                      requires = IS_NULL_OR(
-                                      IS_ONE_OF(db, "cap_alert.id",
-                                                filterby = "(cap_alert.is_template = 'T')",
-                                                label = self.template_represent)),
-                                      represent = self.template_represent,
-                                      label = T("Template"),
-                                      comment = T("Apply a template"),
-                                      ondelete = "RESTRICT")
-
         table = define_table(tablename,
                              # identifier string, as was recieved.
                              Field("is_template", "boolean",
                                    readable=False,
                                    writable=True),
-                             template_id(),
+                             Field("template_id", "reference %s" % tablename,
+                                      requires = IS_NULL_OR(
+                                          IS_ONE_OF(db, "cap_alert.id",
+                                                    filterby="is_template",
+                                                    filter_opts=(True,),
+                                                    label = self.template_represent)),
+                                      represent = self.template_represent,
+                                      label = T("Template"),
+                                      comment = T("Apply a template"),
+                                      ondelete = "RESTRICT"),
                              Field("template_title"),
                              Field("template_settings", "text"),
                              Field("identifier", unique=True,
@@ -886,7 +885,6 @@ class S3CAPModel(S3Model):
                                      table.sent,
                                      table.created_on,
                                      table.sender,
-                                     # left = table.on(table.id == table.parent_item_category_id), Doesn't work
                                      limitby=(0, 1)).first()
 
         #XXX: Should get headline from "info"?
@@ -1108,13 +1106,13 @@ def cap_info_rheader(r):
     return None
 
 # =============================================================================
-def add_submit_button(form, name, value, style="font-weight: bold"):
+def add_submit_button(form, name, value):
     """
         Append a submit button to a form
     """
 
     form[0][-1][0].insert(1, TAG[""](" ",
-                INPUT(_type="submit", _name=name, _style=style,
+                INPUT(_type="submit", _name=name,
                       _value=value)))
 
 # =============================================================================
@@ -1122,8 +1120,14 @@ def alert_form_mods(form):
     """
         Alert form mods
     """
+    #TODO:
+    # rename save button as "Save and edit information"
+    #
     #add_submit_button(form, "add_info", T("Save and add information..."))
-    pass
+    T = current.T
+
+    form[0][-1][0][0].update(_value=T("Save and edit information"),
+                             _name="edit_info")
 
 
 # =============================================================================
@@ -1143,8 +1147,8 @@ def cap_alert_controller():
         if tablename == 'cap_alert':
             alert_form_mods(form)
 
-        if tablename == 'cap_info':
-            add_submit_button(form, "add_language", T("Save and add another language..."))
+        #if tablename == 'cap_info':
+        #    add_submit_button(form, "add_language", T("Save and add another language"))
 
     return output
 
