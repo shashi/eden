@@ -72,10 +72,14 @@
             }
         });
 
-        function load_template_data(data) {
+        function load_template_data(data, overwrite) {
             var tablename = get_table($form),
                 fields = get_template_fields(tablename),
                 values, settings = {};
+
+            if (typeof(overwrite) == 'undefined') {
+                overwrite = false;
+            }
 
             if (!data) {
                 values = {};
@@ -95,11 +99,17 @@
                     //console.log('[name=' + f +']', $f, values);
                     if ($f.is(":text") || $f.is("textarea") || $f.is("select")) {
                         console.log(f, values[f]);
+                        var locked = settings.locked && settings.locked[f];
+
                         switch(typeof(values[f])) {
                         case 'string':
                         case 'undefined':
-                            $f.val(values[f] || '');
-                            if (settings.locked && settings.locked[f]) {
+                            // change field only if locked or overwrite flag is set
+                            if (overwrite || locked) {
+                                $f.val(values[f] || '');
+                            }
+
+                            if (locked) {
                                 $f.attr('disabled', true)
                                   // TODO: i18n
                                   .attr('title', 'This field is locked by the template');
@@ -118,10 +128,10 @@
             });
         }
 
-        function apply_alert_template(id, type) {
+        function apply_alert_template(id, overwrite, type) {
             console.log("Applying template " + id);
             if (id == '' || !id) {
-                load_template_data();
+                load_template_data({}, overwrite);
                 return;
             }
             if (typeof(type) == 'undefined') {
@@ -138,7 +148,7 @@
                 type: 'GET',
                 dataType: 'json',
                 success: function(data) {
-                    load_template_data(data);
+                    load_template_data(data, overwrite);
                 },
                 error: function(e) {
                     console.log(e);
@@ -149,11 +159,15 @@
         }
 
         $form.find('[name=template_id]').change(function () {
-            apply_alert_template($(this).val());
+            apply_alert_template($(this).val(), true);
         });
 
+        if ($form.find('[name=_formname]').val().substring(0, 9) == 'cap_alert') {
+            apply_alert_template($form.find('[name=template_id]').val())
+        }
+
         if ($form.find('[name=_formname]').val().substring(0, 8) == 'cap_info') {
-            apply_alert_template($form.find('[name=template_info_id]').val())
+            apply_alert_template($form.find('[name=template_info_id]').val(), false, 'info');
         }
 
         window.apply_temp = apply_alert_template;
