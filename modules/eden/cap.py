@@ -472,6 +472,7 @@ class S3CAPModel(S3Model):
         table = define_table(tablename,
                              alert_id(),
                              Field("is_template", "boolean",
+                                   default=True,
                                    readable=False,
                                    writable=False),
                              Field("template_info_id", "reference %s" % tablename,
@@ -902,7 +903,7 @@ class S3CAPModel(S3Model):
                                      limitby=(0, 1)).first()
 
         #XXX: Should get headline from "info"?
-        if r.msg_type:
+        if r and r.msg_type:
             sent = r.sent or r.created_on
             return "%s - %s - %s" % (r.msg_type, sent, r.sender)
         else:
@@ -926,7 +927,7 @@ class S3CAPModel(S3Model):
                                      limitby=(0, 1)).first()
 
         #XXX: Should get headline from "info"?
-        if r.is_template:
+        if r and r.is_template:
             return r.template_title
         else:
             return S3CAPModel.alert_represent(id)
@@ -1010,7 +1011,7 @@ def cap_alert_is_template(alert_id):
     r = current.db(query).select(table.is_template,
                                  limitby=(0, 1)).first()
 
-    return r.is_template
+    return r and r.is_template
 
 # =============================================================================
 def cap_alert_rheader(r):

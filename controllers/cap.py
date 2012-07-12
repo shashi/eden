@@ -63,8 +63,7 @@ def info_postp(r, output):
             self_id  = r.component.lastid
 
         if alert_id:
-            alert = s3db.cap_alert(s3db.cap_alert.id == alert_id)
-            if alert and alert.is_template:
+            if s3db.cap_alert_is_template(alert_id):
                 info = s3db.cap_info(s3db.cap_info.id == self_id)
                 if info:
                     info.is_template = True
