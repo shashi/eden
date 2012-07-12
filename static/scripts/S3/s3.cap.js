@@ -162,11 +162,11 @@
             apply_alert_template($(this).val(), true);
         });
 
-        if ($form.find('[name=_formname]').val().substring(0, 9) == 'cap_alert') {
+        if (get_table($form) == 'cap_alert' && !is_cap_template()) {
             apply_alert_template($form.find('[name=template_id]').val())
         }
 
-        if ($form.find('[name=_formname]').val().substring(0, 8) == 'cap_info') {
+        if (get_table($form) == 'cap_info' && !is_cap_info_template()) {
             apply_alert_template($form.find('[name=template_info_id]').val(), false, 'info');
         }
 
