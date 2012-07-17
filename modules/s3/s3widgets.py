@@ -1364,10 +1364,12 @@ class S3LocationSelectorWidget(FormWidget):
 
     def __init__(self,
                  hide_address=False,
-                 site_type=None):
+                 site_type=None,
+                 polygon=False):
 
         self.hide_address = hide_address
         self.site_type = site_type
+        self.polygon = polygon
 
     def __call__(self, field, value, **attributes):
 
@@ -1523,6 +1525,7 @@ S3.gis.tab="%s"''' % s3.gis.tab
                                                  locations.addr_postcode,
                                                  locations.parent,
                                                  locations.path,
+                                                 locations.wkt,
                                                  limitby=(0, 1)).first()
                 if this_location:
                     uid = this_location.uuid
@@ -2046,6 +2049,46 @@ S3.i18n.gis_country_required="%s"''' % (country_snippet,
             script = "s3.locationselector.widget.min.js"
 
         s3.scripts.append("/%s/static/scripts/S3/%s" % (appname, script))
+
+        if self.polygon:
+            polygon_script = """
+
+            """
+            map_button = A(SELECT_ON_MAP,
+                           _style="cursor:pointer; cursor:hand",
+                           _id="gis_location_wkt-btn",
+                           _class="action-btn")
+
+            map_button_row = TR(map_button, TD(),
+                                _id="gis_location_wkt_button_row",
+                                _class="locselect box_middle")
+
+            wkt_input_row = TAG[""](
+                                TR(TD(LABEL(T("Well-known text"))), TD(), _class="box_middle"),
+                                TR(
+                                   TD(TEXTAREA(_class="wkt-input", _id="gis_location_wkt", _name="wkt")),
+                                   TD(), _class="box_middle",
+                                )
+                            )
+            return TAG[""](
+                            TR(INPUT(**attr)),  # Real input, which is hidden
+                            label_row,
+                            tab_rows,
+                            Lx_search_rows,
+                            search_rows,
+                            L0_rows,
+                            name_rows,
+                            street_rows,
+                            postcode_rows,
+                            Lx_rows,
+                            map_button_row,
+                            wkt_input_row,
+                            SCRIPT(polygon_script),
+                            latlon_rows,
+                            divider,
+                            TR(map_popup, TD(), _class="box_middle"),
+                            requires=requires
+                          )
 
         # The overall layout of the components
         return TAG[""](

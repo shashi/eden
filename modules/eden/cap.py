@@ -795,7 +795,7 @@ class S3CAPModel(S3Model):
                                   Field("area_desc",
                                         label = T("Area description"),
                                         required=True),
-                                  Field("polygon", "text"),
+                                  location_id(),
                                   Field("circle"),
                                   Field("geocode", "list:string",
                                         widget = S3KeyValueWidget()),
@@ -815,11 +815,14 @@ class S3CAPModel(S3Model):
                   T("The affected area of the alert message"),
                   T("A text description of the affected area.")))
 
-        table.polygon.comment = DIV(
-              _class="tooltip",
-              _title="%s|%s" % (
-                  T("Points defining a polygon that delineates the affected area"),
-                  T("")))
+        #table.polygon.comment = DIV(
+        #      _class="tooltip",
+        #      _title="%s|%s" % (
+        #          T("Points defining a polygon that delineates the affected area"),
+        #          T("")))
+        #table.polygon.widget = S3LocationPolygonWidget
+
+        table.location_id.widget = S3LocationSelectorWidget(polygon=True)
 
         table.circle.comment = DIV(
               _class="tooltip",

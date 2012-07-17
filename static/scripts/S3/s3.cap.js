@@ -97,14 +97,14 @@
                 try {
                     var $f = $form.find('[name=' + f +']')
                     //console.log('[name=' + f +']', $f, values);
-                    if ($f.is(":text") || $f.is("textarea") || $f.is("select")) {
-                        console.log(f, values[f]);
-                        var locked = settings.locked && settings.locked[f];
+                    console.log(f, values[f]);
+                    var locked = settings.locked && settings.locked[f];
 
-                        switch(typeof(values[f])) {
-                        case 'string':
-                        case 'undefined':
-                            // change field only if locked or overwrite flag is set
+                    switch(typeof(values[f])) {
+                    case 'string':
+                    case 'undefined':
+                        // change field only if locked or overwrite flag is set
+                        if ($f.is(":text") || $f.is("textarea") || $f.is("select")) {
                             if (overwrite || locked) {
                                 $f.val(values[f] || '');
                             }
@@ -117,10 +117,10 @@
                                 $f.removeAttr('disabled')
                                   .attr('title', '');
                             }
-                            break;
-                        case 'object':
-                            break;
                         }
+                        break;
+                    case 'object':
+                        break;
                     }
                 } catch(e) {
                     console.log("ERROR", e);
