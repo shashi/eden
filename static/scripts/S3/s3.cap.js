@@ -223,7 +223,7 @@
             var $tr = $(this),
                 id = $tr.attr("id");
 
-            if (id.match("__row$")) {
+            if (id && id.match("__row$")) {
                 // this row contains the field and comment
                 var name = id.replace(tablename + "_", "").replace("__row", ""),
                     $comment = $tr.find("td.w2p_fc") || $tr.find("td").eq(1);

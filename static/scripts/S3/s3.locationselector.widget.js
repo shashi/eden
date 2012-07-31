@@ -64,6 +64,7 @@ function s3_gis_locationselector_jQuery_onReady() {
         // selection
         var $wkt = $("#gis_location_wkt");
         if ($wkt.length > 0) {
+            console.log(S3.gis.toolbar);
         }
 
 

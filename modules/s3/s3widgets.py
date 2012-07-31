@@ -1592,6 +1592,9 @@ S3.gis.tab="%s"''' % s3.gis.tab
                                                  # Same as a single zoom on a cluster
                                                  zoom = zoom + 2,
                                                  features = features,
+                                                 add_feature_active = not self.polygon,
+                                                 add_polygon = True,
+                                                 add_polygon_active = self.polygon,
                                                  add_feature = True,
                                                  #add_feature_active = True,
                                                  toolbar = True,
@@ -1632,7 +1635,9 @@ S3.gis.tab="%s"''' % s3.gis.tab
                 if map_selector:
                     map_popup = gis.show_map(
                                              add_feature = True,
-                                             add_feature_active = True,
+                                             add_feature_active = not self.polygon,
+                                             add_polygon = True,
+                                             add_polygon_active = self.polygon,
                                              toolbar = True,
                                              collapsed = True,
                                              search = True,
@@ -2051,20 +2056,17 @@ S3.i18n.gis_country_required="%s"''' % (country_snippet,
         s3.scripts.append("/%s/static/scripts/S3/%s" % (appname, script))
 
         if self.polygon:
-            polygon_script = """
-
-            """
-            map_button = A(SELECT_ON_MAP,
+            map_button = A(T("Draw on Map"),
                            _style="cursor:pointer; cursor:hand",
-                           _id="gis_location_wkt-btn",
+                           _id="gis_location_map-btn",
                            _class="action-btn")
 
             map_button_row = TR(map_button, TD(),
-                                _id="gis_location_wkt_button_row",
+                                _id="gis_location_map_button_row",
                                 _class="locselect box_middle")
 
             wkt_input_row = TAG[""](
-                                TR(TD(LABEL(T("Well-known text"))), TD(), _class="box_middle"),
+                                TR(TD(LABEL(T("Polygon (WGS84)"))), TD(), _class="box_middle"),
                                 TR(
                                    TD(TEXTAREA(_class="wkt-input", _id="gis_location_wkt", _name="wkt")),
                                    TD(), _class="box_middle",
@@ -2081,9 +2083,8 @@ S3.i18n.gis_country_required="%s"''' % (country_snippet,
                             street_rows,
                             postcode_rows,
                             Lx_rows,
-                            map_button_row,
                             wkt_input_row,
-                            SCRIPT(polygon_script),
+                            map_button_row,
                             latlon_rows,
                             divider,
                             TR(map_popup, TD(), _class="box_middle"),

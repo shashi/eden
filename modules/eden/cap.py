@@ -251,7 +251,6 @@ class S3CAPModel(S3Model):
         # @ToDo: i18n: Need label=T("")
         tablename = "cap_alert"
         table = define_table(tablename,
-                             # identifier string, as was recieved.
                              Field("is_template", "boolean",
                                    readable=False,
                                    writable=True),
