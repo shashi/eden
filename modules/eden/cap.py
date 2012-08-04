@@ -1037,8 +1037,8 @@ def cap_alert_rheader(r):
                                    "to broadcast this alert!"), _class="error"))
 
             tabs = [
-                    (T("Edit Details"), None),
-                    (T("Edit Information"), "info"),
+                    (T("Alert Qualifiers"), None),
+                    (T("Information"), "info"),
                     #(T("Edit Area"), "info_area"),
                     #(T("Resource Files"), "info_resource"),
                    ]
@@ -1076,15 +1076,15 @@ def cap_template_rheader(r):
                                    _class="error"))
 
             tabs = [
-                    (T("Edit Alert Template"), None),
-                    (T("Edit Info Template"), "info"),
+                    (T("Template"), None),
+                    (T("Information template"), "info"),
                     #(T("Edit Area"), "info_area"),
                     #(T("Resource Files"), "info_resource"),
                    ]
 
             rheader_tabs = s3_rheader_tabs(r, tabs)
 
-            rheader = DIV(TABLE(TR( TH("%s: " % T("Alert template")),
+            rheader = DIV(TABLE(TR( TH("%s: " % T("Template")),
                                     A(S3CAPModel.template_represent(item.id),
                                       _href=URL(c="cap", f="template", args=[item.id, "update"]))
                                   )
@@ -1105,17 +1105,14 @@ def cap_info_rheader(r):
             T = current.T
 
             tabs = [
-                    (T("Edit Information"), None),
-                    (T("Edit Area"), "info_area"),
+                    (T("Information"), None),
                     (T("Resource Files"), "info_resource"),
                    ]
 
-            rheader_tabs = s3_rheader_tabs(r, tabs)
-
-            table = r.table
-
             if cap_alert_is_template(item.alert_id):
-                rheader = DIV(TABLE(TR(TH("%s: " % T("Alert template")),
+                rheader_tabs = s3_rheader_tabs(r, tabs)
+                table = r.table
+                rheader = DIV(TABLE(TR(TH("%s: " % T("Template")),
                                        A(S3CAPModel.template_represent(item.alert_id),
                                          _href=URL(c="cap", f="template",
                                                    args=[item.alert_id, "update"])),
@@ -1132,6 +1129,10 @@ def cap_info_rheader(r):
                 current.response.s3.js_global \
                     .append("S3.i18n.cap_locked = '%s';" % T("Locked"))
             else:
+                tabs.insert(1, (T("Edit Area"), "info_area"))
+                rheader_tabs = s3_rheader_tabs(r, tabs)
+                table = r.table
+
                 rheader = DIV(TABLE(TR(TH("%s: " % T("Alert")),
                                        A(S3CAPModel.alert_represent(item.alert_id),
                                          _href=URL(c="cap", f="alert",
@@ -1196,6 +1197,7 @@ def cap_alert_controller():
 
         if tablename == 'cap_alert':
             alert_form_mods(form)
+            form.update(_class="cap_alert_form")
 
         #if tablename == 'cap_info':
         #    add_submit_button(form, "add_language", T("Save and add another language"))
@@ -1208,25 +1210,43 @@ def cap_template_controller():
 
     T = current.T
     crud_strings = current.response.s3.crud_strings
+    s3db = current.s3db
 
     # XXX: hack!
     tablename = "cap_template"
-    ADD_ALERT_TPL = T("Create Alert Template")
+    ADD_ALERT_TPL = T("Create Template")
     crud_strings[tablename] = Storage(
         title_create = ADD_ALERT_TPL,
-        title_display = T("Alert Template"),
-        title_list = T("Alert Templates"),
-        title_update = T("Edit Alert Template"), # If already-published, this should create a new "Update" alert instead of modifying the original
-        title_upload = T("Import Alert Templates"),
-        title_search = T("Search Alert Templates"),
-        subtitle_create = T("Create new Alert Template"),
-        label_list_button = T("List Alert Templates"),
+        title_display = T("Template"),
+        title_list = T("Templates"),
+        title_update = T("Edit Template"), # If already-published, this should create a new "Update" alert instead of modifying the original
+        title_upload = T("Import Templates"),
+        title_search = T("Search Templates"),
+        subtitle_create = T("Create new Template"),
+        label_list_button = T("List Templates"),
         label_create_button = ADD_ALERT_TPL,
-        label_delete_button = T("Delete Alert Template"),
-        msg_record_created = T("Alert template created"),
-        msg_record_modified = T("Alert template modified"),
-        msg_record_deleted = T("Alert tempmate deleted"),
+        label_delete_button = T("Delete Template"),
+        msg_record_created = T("Template created"),
+        msg_record_modified = T("Template modified"),
+        msg_record_deleted = T("Tempmate deleted"),
         msg_list_empty = T("No templates to show"))
+
+    for f in ["identifier", "msg_type"]:
+        s3db.cap_alert[f].writable = False
+        s3db.cap_alert[f].readable = False
+        s3db.cap_alert[f].requires = None
+
+    for f in ["status", "scope"]:
+        s3db.cap_alert[f].requires = None
+
+    for f in ["urgency", "certainty",
+              "effective", "onset", "expires"]:
+        s3db.cap_info[f].writable = False
+        s3db.cap_info[f].readable = False
+        s3db.cap_info[f].required = False
+
+    for f in ["category", "event"]:
+        s3db.cap_info[f].required = False
 
     output = current.rest_controller("cap", "alert",
                                      rheader=current.s3db.cap_template_rheader)
@@ -1249,8 +1269,11 @@ def cap_template_controller():
 def cap_info_controller():
     """ RESTful CRUD controller """
 
+    s3db = current.s3db
     output = current.rest_controller("cap", "info",
-                                     rheader=current.s3db.cap_info_rheader)
+                                     rheader=s3db.cap_info_rheader)
+
+
     if "form" in output:
         add_submit_button(output["form"], "add_language",
                           current.T("Save and add another language..."))

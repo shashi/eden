@@ -1086,11 +1086,11 @@ class S3OptionsMenu(object):
         ADMIN = session.s3.system_roles.ADMIN
 
         return M(c="cap")(
-                    M("List All Alerts", f="alert", vars={'alert.is_template': 'F'})(
+                    M("List Alerts", f="alert", vars={'alert.is_template': 'F'})(
                         M("Create Alert", f="alert", m="create")
                     ),
-                    M("List Alert Templates", f="template", vars={'alert.is_template': 'T'})(
-                        M("Create Alert Template", f="template", m="create"),
+                    M("List Templates", f="template", vars={'alert.is_template': 'T'})(
+                        M("Create Template", f="template", m="create"),
                     ),
                     M("List CAP Profiles", f="profile")(
                         M("Create CAP Profile", f="profile", m="create")
