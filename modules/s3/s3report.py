@@ -44,13 +44,14 @@ except ImportError:
 
 from gluon import current
 from gluon.html import *
+from gluon.sqlhtml import OptionsWidget
 from gluon.storage import Storage
 
-from s3rest import S3TypeConverter
+from s3resource import S3TypeConverter
 from s3crud import S3CRUD
 from s3search import S3Search
-from s3utils import s3_truncate, s3_has_foreign_key
-from s3validators import IS_INT_AMOUNT, IS_FLOAT_AMOUNT, IS_NUMBER
+from s3utils import s3_truncate, s3_has_foreign_key, s3_unicode
+from s3validators import IS_INT_AMOUNT, IS_FLOAT_AMOUNT, IS_NUMBER, IS_IN_SET
 
 
 # =============================================================================
@@ -100,7 +101,6 @@ class S3Cube(S3CRUD):
         """
 
         T = current.T
-        manager = current.manager
         response = current.response
         session = current.session
         s3 = session.s3
@@ -169,11 +169,9 @@ class S3Cube(S3CRUD):
                 form.accepts(form_values,
                              session,
                              formname="report",
-                             keepvalues=True,
                              onvalidation=self._process_report_options) or \
                 form.accepts(form_values,
                              formname="report",
-                             keepvalues=True,
                              onvalidation=self._process_report_options):
 
                 # The form is valid so save the form values into the session
@@ -296,13 +294,13 @@ class S3Cube(S3CRUD):
 
             else:
                 # @todo: support other formats
-                r.error(501, manager.ERROR.BAD_FORMAT)
+                r.error(501, current.manager.ERROR.BAD_FORMAT)
 
         elif representation in ("html", "iframe"):
 
                 # Fallback to list view ---------------------------------------
                 #
-                manager.configure(self.tablename, insertable=False)
+                current.s3db.configure(self.tablename, insertable=False)
                 output = self.select(r, **attr)
                 response.s3.actions = [
                         dict(url=r.url(method="", id="[id]", vars=r.get_vars),
@@ -310,7 +308,7 @@ class S3Cube(S3CRUD):
                              label = str(T("Details")))
                 ]
         else:
-            r.error(501, manager.ERROR.BAD_METHOD)
+            r.error(501, current.manager.ERROR.BAD_METHOD)
 
         # Complete the page ---------------------------------------------------
         #
@@ -356,11 +354,17 @@ class S3Cube(S3CRUD):
         report_fact = report_options.get("facts", list_fields)
 
         _select_field = self._select_field
-        select_rows = _select_field(report_rows, _id="report-rows", _name="rows",
+        select_rows = _select_field(report_rows,
+                                    _id="report-rows",
+                                    _name="rows",
                                     form_values=form_values)
-        select_cols = _select_field(report_cols, _id="report-cols", _name="cols",
+        select_cols = _select_field(report_cols,
+                                    _id="report-cols",
+                                    _name="cols",
                                     form_values=form_values)
-        select_fact = _select_field(report_fact, _id="report-fact", _name="fact",
+        select_fact = _select_field(report_fact,
+                                    _id="report-fact",
+                                    _name="fact",
                                     form_values=form_values)
 
         # totals are "on" or True by default
@@ -512,26 +516,24 @@ class S3Cube(S3CRUD):
             @param attr: the HTML attributes for the SELECT
         """
 
-        resolve = self.resource.resolve_selectors
-        value = None
-        if current.request.env.request_method == "GET":
-            if "_name" in attr:
-                name = attr["_name"]
-                if form_values and name in form_values:
-                    value = form_values[name]
-        table = self.table
-        lfields, joins, left, distinct = resolve(list_fields)
-        options = [OPTION(f.label,
-                          _value=f.selector,
-                          _selected= value == f.selector and "selected" or None)
-                   for f in lfields
-                    if (f.field is None or f.field.name != table._id.name) and f.show]
-        if len(options) and len(options) < 2:
-            options[0].update(_selected="selected")
+        name = attr["_name"]
+        if form_values:
+            value = form_values.get(name, "")
         else:
-            options.insert(0, OPTION("", _value=None))
-        select = SELECT(options, **attr)
-        return select
+            value = ""
+
+        table = self.table
+        lfields, joins, left, distinct = self.resource.resolve_selectors(list_fields)
+
+        options = []
+        for f in lfields:
+            if (f.field is None or f.field.name != table._id.name) and f.show:
+                options.append((f.selector, f.label))
+
+        dummy_field = Storage(name=name,
+                              requires=IS_IN_SET(options))
+
+        return OptionsWidget.widget(dummy_field, value, **attr)
 
     # -------------------------------------------------------------------------
     def _select_method(self, methods, form_values=None, **attr):
@@ -549,20 +551,22 @@ class S3Cube(S3CRUD):
                        if m in supported_methods]
         else:
             methods = supported_methods.items()
+
+        name = attr["_name"]
+
         if form_values:
-            selected = form_values["aggregate"]
+            value = form_values[name]
         else:
-            selected = None
-        options = [OPTION(m[1],
-                          _value=m[0],
-                          _selected= m[0] == selected and "selected" or None)
-                   for m in methods]
-        if len(options) < 2:
-            options[0].update(_selected="selected")
-        else:
-            options.insert(0, OPTION("", _value=None))
-        select = SELECT(options, **attr)
-        return select
+            value = None
+
+        options = []
+        for method, label in methods:
+            options.append((method, label))
+
+        dummy_field = Storage(name=name,
+                              requires=IS_IN_SET(options))
+
+        return OptionsWidget.widget(dummy_field, value, **attr)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -601,9 +605,6 @@ class S3Report:
             @param layers: the report layers as [(fact, aggregate_method)]
         """
 
-        manager = current.manager
-        model = manager.model
-
         # Initialize ----------------------------------------------------------
         #
         if not rows and not cols:
@@ -631,8 +632,17 @@ class S3Report:
 
         # Get the fields ------------------------------------------------------
         #
-        fields = model.get_config(resource.tablename, "report_fields",
-                 model.get_config(resource.tablename, "list_fields"))
+        s3db = current.s3db
+        # avoid the need to explicitly define report_fields or report_fields 
+        # This can be an issue if any of the rows/cols fields are not in list_fields
+        # Or list_fields is not defined
+        report_options = s3db.get_config(resource.tablename, "report_options")
+        if report_options:
+            row_column_fields = list(set(report_options.get("rows",[]) + report_options.get("cols",[])))
+        else:
+            row_column_fields = None
+        fields = s3db.get_config(resource.tablename, "report_fields",
+                                 row_column_fields)
         self._get_fields(fields=fields)
 
         # Retrieve the records --------------------------------------------------
@@ -1040,8 +1050,6 @@ class S3ContingencyTable(TABLE):
             @param attributes: the HTML attributes for the table
         """
 
-        manager = current.manager
-
         T = current.T
         TOTAL = T("Total")
 
@@ -1133,6 +1141,7 @@ class S3ContingencyTable(TABLE):
 
         cells = report.cell
         rvals = report.row
+
         for i in xrange(numrows):
 
             # Initialize row
@@ -1173,22 +1182,24 @@ class S3ContingencyTable(TABLE):
                         else:
                             add_value(unicode(value))
 
+                    # hold the references
                     layer_ids = []
+                    # get previous lookup values for this layer
                     layer_values = cell_lookup_table.get(layer_idx, {})
 
                     if m == "count":
                         for id in cell.records:
-                            # records == [#, #, #]
-                            lf = lfields[f]
-                            if f in report.records[id]:
-                                # records[#] == {}
-                                fvalue = report.records[id][f]
+                            # cell.records == [#, #, #]
+                            field = lfields[f].field
+                            record = report.records[id]
+
+                            if field.tablename in record:
+                                fvalue = record[field.tablename][field.name]
                             else:
-                                # records[#] == {{}, {}}
-                                fvalue = report.records[id][lf.tname][lf.fname]
+                                fvalue = record[field.name]
 
                             if fvalue is not None:
-                                if s3_has_foreign_key(lf.field):
+                                if s3_has_foreign_key(field):
                                     if not isinstance(fvalue, list):
                                         fvalue = [fvalue]
 
@@ -1196,11 +1207,11 @@ class S3ContingencyTable(TABLE):
                                     for fk in fvalue:
                                         if fk not in layer_ids:
                                             layer_ids.append(fk)
-                                            layer_values[fk] = str(lf.field.represent(fk))
+                                            layer_values[fk] = str(field.represent(fk))
                                 else:
                                     if id not in layer_ids:
                                         layer_ids.append(id)
-                                        layer_values[id] = str(represent(f, fvalue))
+                                        layer_values[id] = s3_unicode(represent(f, fvalue))
 
 
                     cell_ids.append(layer_ids)
@@ -1294,7 +1305,6 @@ class S3ContingencyTable(TABLE):
             @param length: the maximum length N of the result list
             @param reverse: select the least N instead
         """
-        T = current.T
         try:
             if len(tl) > length:
                 m = length - 1
@@ -1302,7 +1312,8 @@ class S3ContingencyTable(TABLE):
                 l.sort(lambda x, y: int(y[1]-x[1]))
                 if least:
                     l.reverse()
-                ts = (str(T("Others")), reduce(lambda s, t: s+t[1], l[m:], 0))
+                ts = (str(current.T("Others")),
+                      reduce(lambda s, t: s+t[1], l[m:], 0))
                 l = l[:m] + [ts]
                 return l
         except (TypeError, ValueError):
@@ -1346,7 +1357,6 @@ class S3ContingencyTable(TABLE):
             @param default: the default representation
         """
 
-        manager = current.manager
         if field in lfields:
             lfield = lfields[field]
             if lfield.field:
@@ -1373,8 +1383,8 @@ class S3ContingencyTable(TABLE):
                             value = convert(datetime.datetime, value)
                     except TypeError, ValueError:
                         pass
-                return manager.represent(lfield.field, value,
-                                         strip_markup=True)
+                return current.manager.represent(lfield.field, value,
+                                                 strip_markup=True)
         if value is None:
             return default
         else:
@@ -1392,15 +1402,12 @@ class S3ContingencyTable(TABLE):
 
         DEFAULT = ""
 
-        manager = current.manager
-        model = manager.model
-
         if field in lfields:
             lf = lfields[field]
         else:
             return DEFAULT
         get_config = lambda key, default, tablename=tablename: \
-                     model.get_config(tablename, key, default)
+                     current.s3db.get_config(tablename, key, default)
         list_fields = get_config("list_fields", None)
         fields = get_config(key, list_fields)
         if fields:

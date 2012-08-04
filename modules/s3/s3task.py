@@ -9,7 +9,7 @@
 
     NB
         Need WEB2PY_PATH environment variable to be defined (e.g. /etc/profile)
-        Tasks need to be defined outside conditional model loads
+        Tasks need to be defined outside conditional model loads (e.g. models/tasks.py)
         Avoid passing state into the async call as state may change before the message is executed (race condition)
 
     Old screencast: http://www.vimeo.com/27478796
@@ -161,8 +161,7 @@ class S3Task(object):
         table.assigned_worker_name.readable = False
         table.assigned_worker_name.writable = False
 
-        manager = current.manager
-        manager.configure(tablename,
+        current.s3db.configure(tablename,
                           list_fields=["id",
                                        "enabled",
                                        "start_time",
@@ -241,12 +240,11 @@ class S3Task(object):
             vars["user_id"] = auth.user.id
 
         # Run the task asynchronously
-        db = current.db
-        record = db.scheduler_task.insert(task_name=task,
-                                          function_name=task,
-                                          args=json.dumps(args),
-                                          vars=json.dumps(vars),
-                                          timeout=timeout)
+        record = current.db.scheduler_task.insert(task_name=task,
+                                                  function_name=task,
+                                                  args=json.dumps(args),
+                                                  vars=json.dumps(vars),
+                                                  timeout=timeout)
 
         # Return record so that status can be polled
         return record

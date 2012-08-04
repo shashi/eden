@@ -12,9 +12,6 @@ resourcename = request.function
 if not settings.has_module(module):
     raise HTTP(404, body="Module disabled: %s" % module)
 
-# Load Models
-#s3mgr.load("dvi_body")
-
 # -----------------------------------------------------------------------------
 def s3_menu_postp():
     # @todo: rewrite this for new framework
@@ -108,6 +105,15 @@ def morgue():
     rheader = S3ResourceHeader([
                     [(T("Morgue"), "name")]
               ], tabs=morgue_tabs)
+
+    # Pre-processor
+    def prep(r):
+        if r.interactive and r.id and not r.component:
+            field = r.table.obsolete
+            field.readable = field.writable = True
+        return True
+    s3.prep = prep
+
     output = s3_rest_controller(rheader=rheader)
     return output
 
@@ -130,7 +136,7 @@ def body():
         if ids:
             s3.filter = (~(btable.pe_id.belongs(ids)))
 
-    s3mgr.configure("dvi_body", main="pe_label", extra="gender")
+    s3db.configure("dvi_body", main="pe_label", extra="gender")
 
     ntable = s3db.pr_note
     ntable.status.readable = False
@@ -164,14 +170,14 @@ def person():
         msg_list_empty = T("No Persons found"),
         msg_no_match = T("No Persons currently reported missing"))
 
-    s3mgr.configure("pr_group_membership",
+    s3db.configure("pr_group_membership",
                     list_fields=["id",
                                  "group_id",
                                  "group_head",
                                  "description"
                                 ])
 
-    s3mgr.configure("pr_person",
+    s3db.configure("pr_person",
                     listadd=False,
                     editable=False,
                     deletable=False,
@@ -282,5 +288,4 @@ def tooltip():
         response.view = "pr/ajaxtips/%s.html" % formfield
     return dict()
 
-# -----------------------------------------------------------------------------
-
+# END =========================================================================

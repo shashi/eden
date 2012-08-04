@@ -9,9 +9,6 @@
     Messages get sent to the Outbox (& Log)
     From there, Cron tasks collect them & send them
 
-    @author: Praneeth Bodduluri <lifeeth[at]gmail.com>
-    @author: Fran Boon <fran[at]aidiq.com>
-
     @copyright: 2009-2012 (c) Sahana Software Foundation
     @license: MIT
 
@@ -38,8 +35,7 @@
 
 """
 
-__all__ = ["S3Msg",
-           "S3Compose"]
+__all__ = ["S3Msg", "S3Compose"]
 
 import datetime
 import string
@@ -201,6 +197,7 @@ class S3Msg(object):
         ltable = s3db.msg_log
         wtable = s3db.msg_workflow
         otable = s3db.msg_outbox
+        ctable = s3db.pr_contact
         
         query = (wtable.workflow_task_id == workflow) & \
                 (wtable.source_task_id == source)
@@ -220,8 +217,18 @@ class S3Msg(object):
                 reply = ltable.insert(recipient = row.sender,
                                       subject ="Parsed Reply",
                                       message = reply)
-                otable.insert(message_id = reply.id,
-                              address = row.sender)
+                try:
+                    email = row.sender.split("<")[1].split(">")[0]
+                    query = (ctable.contact_method == "EMAIL") & \
+                        (ctable.value == email) 
+                    pe_ids = db(query).select(ctable.pe_id)
+                except:
+                    raise ValueError("Email address not defined!")
+                
+                if pe_ids:
+                    for pe_id in pe_ids:
+                        otable.insert(message_id = reply.id,
+                                      address = row.sender, pe_id = pe_id.pe_id)
                 db.commit()
 
         return    
@@ -237,6 +244,7 @@ class S3Msg(object):
                 subject = "",
                 message = "",
                 url = None,
+                formid = None,
                ):
         """
             Form to Compose a Message
@@ -253,12 +261,10 @@ class S3Msg(object):
             @param subject: The default subject text (for Emails)
             @param message: The default message text
             @param url: Redirect to the specified URL() after message sent
+            @param formid: If set, allows multiple forms open in different tabs
         """
 
         T = current.T
-        auth = current.auth
-        crud = current.crud
-        s3 = current.response.s3
         vars = current.request.vars
 
         s3db = current.s3db
@@ -269,6 +275,7 @@ class S3Msg(object):
             url = URL(c="msg",
                       f="compose")
 
+        auth = current.auth
         if auth.is_logged_in() or auth.basic():
             pass
         else:
@@ -288,6 +295,10 @@ class S3Msg(object):
         ltable.actioned.writable = ltable.actioned.readable = False
         ltable.actionable.writable = ltable.actionable.readable = False
         ltable.actioned_comments.writable = ltable.actioned_comments.readable = False
+        ltable.inbound.writable = ltable.inbound.readable = False
+        ltable.is_parsed.writable = ltable.is_parsed.readable = False
+        ltable.reply.writable = ltable.reply.readable = False
+        ltable.source_task_id.writable = ltable.source_task_id.readable = False
 
         ltable.subject.label = T("Subject")
         ltable.message.label = T("Message")
@@ -333,9 +344,8 @@ class S3Msg(object):
                 Route the message
             """
 
-            session = current.session
             if not vars.pe_id:
-                session.error = T("Please enter the recipient(s)")
+                current.session.error = T("Please enter the recipient(s)")
                 redirect(url)
             if auth.user:
                 sender_pe_id = auth.user.pe_id
@@ -346,18 +356,19 @@ class S3Msg(object):
                                   vars.message,
                                   sender_pe_id,
                                   vars.pr_message_method):
-                # Trigger a Process Outbox
-                self.process_outbox(contact_method = vars.pr_message_method)
-                session.confirmation = T("Check outbox for the message status")
+                current.session.confirmation = T("Check outbox for the message status")
                 redirect(url)
             else:
-                session.error = T("Error in message")
+                current.session.error = T("Error in message")
                 redirect(url)
 
         # Source forms
+        crud = current.crud
         logform = crud.create(ltable,
-                              onvalidation = compose_onvalidation)
-        outboxform = crud.create(otable)
+                              onvalidation = compose_onvalidation,
+                              formname = "msg_log/%s" % formid)
+        outboxform = crud.create(otable,
+                                 formname = "msg_outbox/%s" % formid)
 
         # Shortcuts
         lcustom = logform.custom
@@ -368,8 +379,8 @@ class S3Msg(object):
         if recipient:
             ocustom.widget.pe_id["_class"] = "hide"
             pe_row.append(TD(ocustom.widget.pe_id,
-                             s3.pr_pentity_represent(recipient,
-                                                     show_label=False)))
+                             s3db.pr_pentity_represent(recipient,
+                                                       show_label=False)))
         else:
             pe_row.append(TD(INPUT(_id="dummy", _class="ac_input", _size="50"),
                              ocustom.widget.pe_id))
@@ -413,15 +424,16 @@ class S3Msg(object):
 
         # Control the Javascript in static/scripts/S3/s3.msg.js
         if not recipient:
+            s3 = current.response.s3
             if recipient_type:
-                s3.js_global.append("S3.msg_search_url='%s';" % \
+                s3.js_global.append('''S3.msg_search_url="%s"''' % \
                                     URL(c="msg", f="search",
                                         vars={"type":recipient_type}))
             else:
-                s3.js_global.append("S3.msg_search_url='%s';" % \
+                s3.js_global.append('''S3.msg_search_url="%s"''' % \
                                     URL(c="msg", f="search"))
 
-            s3.jquery_ready.append("s3_msg_ac_pe_input();")
+            s3.jquery_ready.append('''s3_msg_ac_pe_input()''')
 
         # Default title
         # - can be overridden by the calling function
@@ -486,8 +498,9 @@ class S3Msg(object):
             except:
                 return False
 
-        # @ToDo: Process Outbox (once this can be done async)
-        # - or is this better to do in the wrapper script?
+        # Process OutBox async
+        current.s3task.async("msg_process_outbox",
+                             args=[pr_message_method])
 
         return True
 
@@ -1024,6 +1037,9 @@ class S3Msg(object):
 
         # Initialize Twitter API
         twitter_settings = self.get_twitter_api()
+        if not twitter_settings:
+            # Abort
+            return False
         tweepy = self.tweepy
 
         twitter_api = None
@@ -1069,6 +1085,9 @@ class S3Msg(object):
 
         # Initialize Twitter API
         twitter_settings = self.get_twitter_api()
+        if not twitter_settings:
+            # Abort
+            return False
         tweepy = self.tweepy
 
         twitter_api = None
@@ -1235,7 +1254,8 @@ class S3Msg(object):
                 body = textParts[0]
                 # Store in DB
                 inbox_table.insert(sender=sender, subject=subject, body=body)
-                log_table.insert(sender=sender, subject=subject, message=body, source_task_id=source_task_id)
+                log_table.insert(sender=sender, subject=subject, message=body, \
+                                 source_task_id=source_task_id, inbound=True)
                 
                 if delete:
                     # Add it to the list of messages to delete later
@@ -1307,7 +1327,9 @@ class S3Msg(object):
                         body = textParts[0]
                         # Store in DB
                         inbox_table.insert(sender=sender, subject=subject, body=body)
-                        log_table.insert(sender=sender, subject=subject, message=body, source_task_id=source_task_id)
+                        log_table.insert(sender=sender, subject=subject, \
+                                message=body, source_task_id=source_task_id, \
+                                inbound = True)
                         
                         if delete:
                             # Add it to the list of messages to delete later
@@ -1343,11 +1365,10 @@ class S3Compose(S3CRUD):
             @param attr: controller attributes for the request
         """
 
-        manager = current.manager
         if r.http in ("GET", "POST"):
             output = self.compose(r, **attr)
         else:
-            r.error(405, manager.ERROR.BAD_METHOD)
+            r.error(405, current.manager.ERROR.BAD_METHOD)
         return output
 
     # -------------------------------------------------------------------------
@@ -1361,10 +1382,6 @@ class S3Compose(S3CRUD):
 
         T = current.T
         auth = current.auth
-        manager = current.manager
-        response = current.response
-        session = current.session
-        settings = current.deployment_settings
 
         url = r.url()
         self.url = url
@@ -1376,8 +1393,8 @@ class S3Compose(S3CRUD):
             redirect(URL(c="default", f="user", args="login",
                          vars={"_next" : url}))
 
-        if not settings.has_module("msg"):
-            session.error = T("Cannot send messages if Messaging module disabled")
+        if not current.deployment_settings.has_module("msg"):
+            current.session.error = T("Cannot send messages if Messaging module disabled")
             redirect(URL(f="index"))
 
         #_vars = r.get_vars
@@ -1385,7 +1402,7 @@ class S3Compose(S3CRUD):
         self.recipients = None
         form = self._compose_form()
         # @ToDo: A 2nd Filter form
-        # if form.accepts(r.post_vars, session,
+        # if form.accepts(r.post_vars, current.session,
                         # formname="compose",
                         # keepvalues=True):
             # query, errors = self._process_filter_options(form)
@@ -1401,7 +1418,7 @@ class S3Compose(S3CRUD):
             #output = dict(items=items)
             output = dict(form=form)
         else:
-            r.error(501, manager.ERROR.BAD_METHOD)
+            r.error(501, current.manager.ERROR.BAD_METHOD)
 
         # Complete the page
         if representation == "html":
@@ -1422,8 +1439,8 @@ class S3Compose(S3CRUD):
             output["title"] = title
             #output["subtitle"] = subtitle
             #output["form"] = form
-            #response.view = self._view(r, "list_create.html")
-            response.view = self._view(r, "create.html")
+            #current.response.view = self._view(r, "list_create.html")
+            current.response.view = self._view(r, "create.html")
 
         return output
 
@@ -1463,8 +1480,6 @@ class S3Compose(S3CRUD):
                              vars.message,
                              sender_pe_id,
                              vars.pr_message_method):
-            # Trigger a Process Outbox
-            msg.process_outbox(contact_method = vars.pr_message_method)
             session.confirmation = T("Check outbox for the message status")
             redirect(url)
         else:

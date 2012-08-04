@@ -74,11 +74,11 @@ def s3_debug(message, value=None):
     try:
         output = "S3 Debug: %s" % str(message)
         if value:
-            "%s: %s" % (output, str(value))
+            output = "%s: %s" % (output, str(value))
     except:
         output = u"S3 Debug: %s" % unicode(message)
         if value:
-            u"%s: %s" % (output, unicode(value))
+            output = u"%s: %s" % (output, unicode(value))
 
     print >> sys.stderr, output
 
@@ -117,7 +117,7 @@ def s3_dev_toolbar():
 
 # =============================================================================
 def s3_mark_required(fields,
-                     mark_required=None,
+                     mark_required=[],
                      label_html=(lambda field_label:
                                  DIV("%s:" % field_label,
                                      SPAN(" *", _class="req")))):
@@ -139,14 +139,14 @@ def s3_mark_required(fields,
     for field in fields:
         if field.writable:
             validators = field.requires
-            if isinstance(validators, IS_EMPTY_OR):
+            if isinstance(validators, IS_EMPTY_OR) and field.name not in mark_required:
                 # Allow notnull fields to be marked as not required
                 # if we populate them onvalidation
                 labels[field.name] = "%s:" % field.label
                 continue
             else:
                 required = field.required or field.notnull or \
-                            mark_required and field.name in mark_required
+                            field.name in mark_required
             if not validators and not required:
                 labels[field.name] = "%s:" % field.label
                 continue
@@ -281,9 +281,6 @@ def s3_filter_staff(r):
     db = current.db
     try:
         hrtable = db.hrm_human_resource
-    except:
-        return
-    try:
         site_id = r.record.site_id
         person_id_field = r.target()[2].person_id
     except:
@@ -461,7 +458,7 @@ def s3_represent_facilities(db, site_ids, link=True):
     return results
 
 # =============================================================================
-def s3_comments_represent(text, showlink=True):
+def s3_comments_represent(text, show_link=True):
     """
         Represent Comments Fields
 
@@ -470,7 +467,7 @@ def s3_comments_represent(text, showlink=True):
 
     if len(text) < 80:
         return text
-    elif not showlink:
+    elif not show_link:
         return "%s..." % text[:76]
     else:
         import uuid
@@ -580,16 +577,18 @@ def s3_auth_user_represent(id):
         @todo: parameter description?
     """
 
-    db = current.db
-    s3db = current.s3db
+    if not id:
+        return current.messages.NONE
 
-    table = s3db.auth_user
+    db = current.db
+    table = db.auth_user
     user = db(table.id == id).select(table.email,
                                      limitby=(0, 1),
-                                     cache=s3db.cache).first()
-    if user:
+                                     cache=current.s3db.cache).first()
+    try:
         return user.email
-    return None
+    except:
+        return current.messages.UNKNOWN_OPT
 
 # =============================================================================
 def s3_auth_group_represent(opt):
@@ -624,55 +623,17 @@ def s3_auth_group_represent(opt):
     return ", ".join(roles)
 
 # =============================================================================
-def s3_include_debug():
+def s3_include_debug_css():
     """
-        Generates html to include:
-            the js scripts listed in /static/scripts/tools/sahana.js.cfg
-            the css listed in /private/templates/<template>/css.cfg
+        Generates html to include the css listed in
+            /private/templates/<template>/css.cfg
     """
-
-    # Disable printing
-    #class dummyStream:
-    #    """ dummyStream behaves like a stream but does nothing. """
-    #    def __init__(self): pass
-    #    def write(self,data): pass
-    #    def read(self,data): pass
-    #    def flush(self): pass
-    #    def close(self): pass
-
-    #save_stdout = sys.stdout
-    # Redirect all prints
-    #sys.stdout = dummyStream()
 
     request = current.request
     folder = request.folder
     appname = request.application
     theme = current.deployment_settings.get_theme()
-
-    # JavaScript
-    scripts_dir = os.path.join(folder, "static", "scripts")
-    sys.path.append(os.path.join(scripts_dir, "tools"))
-    import mergejsmf
-
-    configDictCore = {
-        ".": scripts_dir,
-        "web2py": scripts_dir,
-        #"T2":     scripts_dir_path,
-        "S3":     scripts_dir
-    }
-    configFilename = "%s/tools/sahana.js.cfg"  % scripts_dir
-    (fs, files) = mergejsmf.getFiles(configDictCore, configFilename)
-
-    # Restore prints
-    #sys.stdout = save_stdout
-
-    include = ""
-    for file in files:
-        include = '%s\n<script src="/%s/static/scripts/%s" type="text/javascript"></script>' \
-            % (include, appname, file)
-
-    # CSS
-    include = "%s\n <!-- CSS Syles -->" % include
+    
     css_cfg = "%s/private/templates/%s/css.cfg" % (folder, theme)
     try:
         f = open(css_cfg, "r")
@@ -680,10 +641,43 @@ def s3_include_debug():
         raise HTTP(500, "Theme configuration file missing: private/templates/%s/css.cfg" % theme)
     files = f.readlines()
     files = files[:-1]
+    include = ""
     for file in files:
         include = '%s\n<link href="/%s/static/styles/%s" rel="stylesheet" type="text/css" />' \
             % (include, appname, file[:-1])
     f.close()
+
+    return XML(include)
+
+# =============================================================================
+def s3_include_debug_js():
+    """
+        Generates html to include the js scripts listed in
+            /static/scripts/tools/sahana.js.cfg
+    """
+
+    request = current.request
+    folder = request.folder
+    appname = request.application
+    theme = current.deployment_settings.get_theme()
+
+    scripts_dir = os.path.join(folder, "static", "scripts")
+    sys.path.append(os.path.join(scripts_dir, "tools"))
+
+    import mergejsmf
+
+    configDictCore = {
+        ".": scripts_dir,
+        "web2py": scripts_dir,
+        "S3":     scripts_dir
+    }
+    configFilename = "%s/tools/sahana.js.cfg"  % scripts_dir
+    (fs, files) = mergejsmf.getFiles(configDictCore, configFilename)
+
+    include = ""
+    for file in files:
+        include = '%s\n<script src="/%s/static/scripts/%s" type="text/javascript"></script>' \
+            % (include, appname, file)
 
     return XML(include)
 
@@ -806,28 +800,25 @@ def s3_register_validation():
     settings = current.deployment_settings
 
     if request.cookies.has_key("registered"):
-        password_position = "last"
+        password_position = '''last'''
     else:
-        password_position = "first"
+        password_position = '''first'''
 
     if settings.get_auth_registration_mobile_phone_mandatory():
-        mobile = """
-mobile: {
-    required: true
-},
-"""
+        mobile = '''
+  mobile:{
+   required:true
+  },'''
     else:
         mobile = ""
 
     if settings.get_auth_registration_organisation_mandatory():
-        org1 = """
-organisation_id: {
-    required: true
-},
-"""
-        org2 = "".join(( """,
-organisation_id: '""", str(T("Enter your organization")), """',
-""" ))
+        org1 = '''
+  organisation_id:{
+   required: true
+  },'''
+        org2 = "".join((''',
+  organisation_id:"''', str(T("Enter your organization")), '''"'''))
     else:
         org1 = ""
         org2 = ""
@@ -844,72 +835,71 @@ organisation_id: '""", str(T("Enter your organization")), """',
         whitelists = db(query).select(table.organisation_id,
                                       table.domain)
         if whitelists:
-            domains = """$('#auth_user_organisation_id__row').hide();
-S3.whitelists = {
-"""
+            domains = '''$('#auth_user_organisation_id__row').hide()
+S3.whitelists={
+'''
             count = 0
             for whitelist in whitelists:
                 count += 1
-                domains += "'%s': %s" % (whitelist.domain,
+                domains += "'%s':%s" % (whitelist.domain,
                                          whitelist.organisation_id)
                 if count < len(whitelists):
                     domains += ",\n"
                 else:
                     domains += "\n"
-            domains += """};
-$('#regform #auth_user_email').blur( function() {
-    var email = $('#regform #auth_user_email').val();
-    var domain = email.split('@')[1];
-    if (undefined != S3.whitelists[domain]) {
-        $('#auth_user_organisation_id').val(S3.whitelists[domain]);
-    } else {
-        $('#auth_user_organisation_id__row').show();
-    }
-});
-"""
+            domains += '''}
+$('#regform #auth_user_email').blur(function(){
+ var email=$('#regform #auth_user_email').val()
+ var domain=email.split('@')[1]
+ if(undefined!=S3.whitelists[domain]){
+  $('#auth_user_organisation_id').val(S3.whitelists[domain])
+ }else{
+  $('#auth_user_organisation_id__row').show()
+ }
+})'''
 
     # validate signup form on keyup and submit
-    # @ToDo: //remote: 'emailsurl'
-    script = "".join(( domains, """
+    # @ToDo: //remote:'emailsurl'
+    script = "".join(( domains, '''
 $('#regform').validate({
-    errorClass: 'req',
-    rules: {
-        first_name: {
-            required: true
-        },""", mobile, """
-        email: {
-            required: true,
-            email: true
-        },""", org1, """
-        password: {
-            required: true
-        },
-        password_two: {
-            required: true,
-            equalTo: '.password:""", password_position, """'
-        }
-    },
-    messages: {
-        firstname: '""", str(T("Enter your firstname")), """',
-        password: {
-            required: '""", str(T("Provide a password")), """'
-        },
-        password_two: {
-            required: '""", str(T("Repeat your password")), """',
-            equalTo: '""", str(T("Enter the same password as above")), """'
-        },
-        email: {
-            required: '""", str(T("Please enter a valid email address")), """',
-            minlength: '""", str(T("Please enter a valid email address")), """'
-        }""", org2, """
-    },
-    errorPlacement: function(error, element) {
-        error.appendTo( element.parent().next() );
-    },
-    submitHandler: function(form) {
-        form.submit();
-    }
-});""" ))
+ errorClass:'req',
+ rules:{
+  first_name:{
+   required:true
+  },''', mobile, '''
+  email:{
+   required:true,
+   email:true
+  },''', org1, '''
+  password:{
+   required:true
+  },
+  password_two:{
+   required:true,
+   equalTo:".password:''', password_position, '''"
+  }
+ },
+ messages:{
+  first_name:"''', str(T("Enter your first name")), '''",
+  password:{
+   required:"''', str(T("Provide a password")), '''"
+  },
+  password_two:{
+   required:"''', str(T("Repeat your password")), '''",
+   equalTo:"''', str(T("Enter the same password as above")), '''"
+  },
+  email:{
+   required:"''', str(T("Please enter a valid email address")), '''",
+   email:"''', str(T("Please enter a valid email address")), '''"
+  }''', org2, '''
+ },
+ errorPlacement:function(error,element){
+  error.appendTo(element.parent().next())
+ },
+ submitHandler:function(form){
+  form.submit()
+ }
+})''' ))
     current.response.s3.jquery_ready.append(script)
 
 # =============================================================================
@@ -933,30 +923,6 @@ def s3_filename(filename):
     return "".join(c for c in cleanedFilename if c in validFilenameChars)
 
 # =============================================================================
-def s3_table_links(reference):
-    """
-        Return a dict of tables & their fields which have references to the
-        specified table
-
-        @deprecated: to be replaced by db[tablename]._referenced_by
-        - used by controllers/gis.py & pr.py
-    """
-
-    db = current.db
-    current.s3db.load_all_models()
-    tables = {}
-    for table in db.tables:
-        count = 0
-        for field in db[table].fields:
-            if str(db[table][field].type) == "reference %s" % reference:
-                if count == 0:
-                    tables[table] = {}
-                tables[table][count] = field
-                count += 1
-
-    return tables
-
-# =============================================================================
 def s3_has_foreign_key(field, m2m=True):
     """
         Check whether a field contains a foreign key constraint
@@ -969,7 +935,11 @@ def s3_has_foreign_key(field, m2m=True):
                to find real foreign key constraints, then set m2m=False.
     """
 
-    ftype = str(field.type)
+    try:
+        ftype = str(field.type)
+    except:
+        # Virtual Field
+        return False
     if ftype[:9] == "reference":
         return True
     if m2m and ftype[:14] == "list:reference":
@@ -1015,6 +985,38 @@ def s3_get_foreign_key(field, m2m=True):
         else:
             key = None
     return (rtablename, key, multiple)
+
+# =============================================================================
+def s3_unicode(s, encoding="utf-8"):
+    """
+        Convert an object into an unicode instance, to be used instead of
+        unicode(s) (Note: user data should never be converted into str).
+
+        @param s: the object
+        @param encoding: the character encoding
+    """
+
+    if isinstance(s, unicode):
+        return s
+    try:
+        if not isinstance(s, basestring):
+            if hasattr(s, "__unicode__"):
+                s = unicode(s)
+            else:
+                try:
+                    s = unicode(str(s), encoding, "strict")
+                except UnicodeEncodeError:
+                    if not isinstance(s, Exception):
+                        raise
+                    s = " ".join([s3_unicode(arg, encoding) for arg in s])
+        else:
+            s = s.decode(encoding)
+    except UnicodeDecodeError:
+        if not isinstance(s, Exception):
+            raise
+        else:
+            s = " ".join([s3_unicode(arg, encoding) for arg in s])
+    return s
 
 # =============================================================================
 def search_vars_represent(search_vars):
@@ -1381,13 +1383,11 @@ class SQLTABLES3(SQLTABLE):
                  columns=None,
                  th_link="",
                  **attributes):
-        """
-            @todo: docstring?
-        """
 
         # reverted since it causes errors (admin/user & manual importing of req/req/import)
         # super(SQLTABLES3, self).__init__(**attributes)
         TABLE.__init__(self, **attributes)
+
         self.components = []
         self.attributes = attributes
         self.sqlrows = sqlrows
@@ -1505,6 +1505,283 @@ class SQLTABLES3(SQLTABLE):
         components.append(TBODY(*tbody))
 
 # =============================================================================
+class S3SQLTable(object):
+    """
+    """
+
+    DEFAULT_PAGE_SIZE = 25
+
+    def __init__(self, cols, rows, **kwargs):
+        #super(S3SQLTable, self).__init__(**kwargs)
+
+        self.template = "_table.html" # not used yet
+
+        self.cols = cols
+        self.rows = rows
+        self.limit = kwargs.get("limit", None)
+        self.row_actions = kwargs.get("row_actions", None)
+        self.bulk_actions = kwargs.get("bulk_actions", None)
+
+        self.html_attributes = {}
+        for key, value in kwargs.items():
+            if key[0] == "_":
+                self.html_attributes[key] = value
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def from_resource(cls, resource, cols, limit=None, orderby=None, **kwargs):
+        """
+        """
+
+        from s3resource import S3FieldSelector
+        T = current.T
+
+        # columns
+        orderby_field = None
+
+        for col in cols:
+            fs = S3FieldSelector(col["name"])
+            lf = fs.resolve(resource)
+
+            if lf.field != None:
+                field = lf.field
+            else:
+                field = None
+
+            if "label" not in col:
+                if field is None:
+                    col["label"] = " ".join([w.capitalize() for w in col["name"].split(".")[-1].split("_")])
+                else:
+                    col["label"] = field.label
+
+            if "type" not in col:
+                if field is None:
+                    col["type"] = "string"
+                else:
+                    col["type"] = str(field.type)
+
+            if orderby and str(orderby) == col["name"]:
+                orderby_field = field # can't order by virtual fields?
+
+        # rows
+        rows = None
+
+        if limit is None or limit > 0:
+            fields = [col["name"] for col in cols]
+            rows = resource.sqltable(fields=fields,
+                                     start=None,
+                                     limit=limit,
+                                     orderby=orderby_field,
+                                     as_rows=True)
+
+        if rows:
+            # values from rows
+            r_rows = [] # rendered rows
+            represent = current.manager.represent
+            for row in rows:
+                r_row = {} # rendered row
+                for col in cols:
+                    try:
+                        lf = S3FieldSelector(col["name"]).resolve(resource)
+                    except:
+                        # invalid field selector
+                        r_row[col["name"]] = ""
+                        continue
+
+                    try:
+                        value = S3FieldSelector.extract(resource, row, lf)
+                    except:
+                        # field not found in row
+                        value = None
+
+                    field = lf.field
+                    if field is not None:
+                        r_row[col["name"]] = represent(field, value)
+                    else:
+                        r_row[col["name"]] = s3_unicode(value)
+
+                r_rows.append(r_row)
+            rows = r_rows
+        else:
+            rows = []
+
+        return cls(cols, rows, **kwargs)
+
+    # -------------------------------------------------------------------------
+    def html(self):
+        """
+        """
+
+        T = current.T
+
+        # Columns
+        html_cols = []
+
+        for col in self.cols:
+            html_cols.append(TH(col["label"], _scope="col"))
+
+        # Rows
+        html_rows = []
+        for row in self.rows[:self.limit]:
+            html_cells = []
+
+            for col in self.cols:
+                if col['name']:
+                    cell_value = row[col["name"]]
+                    if cell_value is None:
+                        cell_value = ""
+                else:
+                    cell_value = ""
+
+                # some values are HTML, wrap in XML()
+                html_cells.append(TD(XML(cell_value)))
+
+            html_rows.append(TR(*html_cells))
+
+        # Table
+        html_table = TABLE(THEAD(TR(*html_cols)),
+                           TBODY(*html_rows),
+                           **self.html_attributes)
+
+        if self.bulk_actions:
+            actions = []
+            for action, label in self.bulk_actions:
+                actions.append(OPTION(label, _value=action))
+
+            html_table = FORM(SELECT(OPTION("", ""),
+                                     *actions,
+                                     _name="action"),
+                              INPUT(_type="submit", _value=T("Go")),
+                              html_table,
+                              _action="",
+                              _method="post",
+                              _class="dataTable-actions")
+
+        return html_table
+
+    # -------------------------------------------------------------------------
+    def xml(self):
+        return s3_unicode(self.html())
+
+# =============================================================================
+class S3DataTable(S3SQLTable):
+    """
+    """
+
+    def __init__(self, cols, rows, **kwargs):
+        super(S3DataTable, self).__init__(cols, rows, **kwargs)
+
+        html_classes = self.html_attributes.get("_class", "").split(" ")
+        html_classes += ["dataTable", "display"]
+        self.html_attributes["_class"] = " ".join(html_classes)
+
+        #self.page_size = kwargs.get("page_size", self.DEFAULT_PAGE_SIZE)
+        self.options = kwargs.get("options")
+        self.total_rows = kwargs.get("total_rows")
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def from_resource(cls, resource, cols, **kwargs):
+        """
+            @param page_size: number of rows to display per page
+            @param limit: number of rows to fetch from the database
+        """
+
+        options = kwargs.pop("options", {})
+        page_size = kwargs.pop("page_size", None)
+        limit = kwargs.pop("limit", None)
+
+        if kwargs.get("no_sspag", False):
+            page_size = None
+
+        if page_size is None:
+            options["bServerSide"] = False
+        elif "sAjaxSource" in options:
+            options["bServerSide"] = True
+            limit = page_size
+
+        if "bulk_actions" in kwargs:
+            cols.insert(0, {"name": "id",
+                            "label": "",
+                            "type": "int",
+                            "bSortable": False})
+        elif "row_actions" in kwargs:
+            cols.insert(0, {"name": "id",
+                            "label": "",
+                            "type": "int",
+                            "bSortable": False,
+                            "bVisible": False})
+
+        table = super(S3DataTable, cls).from_resource(resource, cols, limit, **kwargs)
+
+        if limit and len(table.rows) < limit:
+            table.total_rows = len(table.rows)
+        else:
+            table.total_rows = resource.count()
+
+        table.options = options
+        table.page_size = page_size
+
+        return table
+
+    # -------------------------------------------------------------------------
+    def xml(self):
+        """
+        """
+
+        # dataTable initialisation options
+        if self.page_size:
+            self.options["iDisplayLength"] = self.page_size
+            self.options["iDeferLoading"] = self.total_rows
+
+        # Page size drop-down
+        aLengthMenu = set([
+            (25, 25),
+            (50, 50),
+            (-1, "All"),
+        ])
+        aLengthMenu.add((self.page_size, self.page_size))
+        aLengthMenu = sorted(aLengthMenu, key=lambda x: x[1])
+        aLengthMenu = list(zip(*aLengthMenu))
+        self.options["aLengthMenu"] = aLengthMenu
+
+        if self.row_actions:
+            self.cols.append({"name": "",
+                              "label": "",
+                              "type": None,
+                              "mDataProp": None,
+                              "bSortable": False})
+
+        html_table = super(S3DataTable, self).html()
+
+        self.options["aoColumns"] = []
+        for col in self.cols:
+            dt_col = {
+                "sName": col["name"],
+                "sType": col["type"]
+            }
+            dt_col.update(col)
+            dt_col["name"] = None
+            del dt_col["label"]
+            self.options["aoColumns"].append(dt_col)
+
+        html_script = SCRIPT(
+'''if(S3.dataTablesInstances==undefined){
+ S3.dataTablesInstances=new Array()
+}
+S3.dataTablesInstances.push({
+ 'options':%s,
+ 'row_actions':%s,
+ 'bulk_actions':%s
+})
+S3.i18n.all="%s"''' % (json.dumps(self.options),
+                       self.row_actions,
+                       self.bulk_actions,
+                       current.T("All")))
+
+        return s3_unicode(TAG[""](html_table, html_script))
+
+# =============================================================================
 class S3BulkImporter(object):
     """
         Import CSV files of data to pre-populate the database.
@@ -1573,14 +1850,19 @@ class S3BulkImporter(object):
             app = details[0].strip('" ')
             res = details[1].strip('" ')
             request = current.request
+
             csvFileName = details[2].strip('" ')
-            (csvPath, csvFile) = os.path.split(csvFileName)
-            if csvPath != "":
-                path = os.path.join(request.folder,
-                                    "private",
-                                    "templates",
-                                    csvPath)
-            csv = os.path.join(path, csvFile)
+            if csvFileName[:7] == "http://":
+                csv = csvFileName
+            else:
+                (csvPath, csvFile) = os.path.split(csvFileName)
+                if csvPath != "":
+                    path = os.path.join(request.folder,
+                                        "private",
+                                        "templates",
+                                        csvPath)
+                csv = os.path.join(path, csvFile)
+
             xslFileName = details[3].strip('" ')
             templateDir = os.path.join(request.folder,
                                        "static",
@@ -1645,7 +1927,6 @@ class S3BulkImporter(object):
         """ Method that will execute each import job, in order """
         start = datetime.datetime.now()
         if task[0] == 1:
-            manager = current.manager
             db = current.db
             request = current.request
             response = current.response
@@ -1661,7 +1942,7 @@ class S3BulkImporter(object):
                 details = self.alternateTables[tablename]
                 if "tablename" in details:
                     tablename = details["tablename"]
-                manager.load(tablename)
+                current.s3db.table(tablename)
                 if "loader" in details:
                     loader = details["loader"]
                     if loader is not None:
@@ -1672,18 +1953,33 @@ class S3BulkImporter(object):
                     name = details["name"]
 
             try:
-                resource = manager.define_resource(prefix, name)
-            except KeyError:
+                resource = current.manager.define_resource(prefix, name)
+            except AttributeError:
                 # Table cannot be loaded
                 self.errorList.append("WARNING: Unable to find table %s import job skipped" % tablename)
                 return
 
             # Check if the source file is accessible
-            try:
-                csv = open(task[3], "r")
-            except IOError:
-                self.errorList.append(errorString % task[3])
-                return
+            filename = task[3]
+            if filename[:7] == "http://":
+                import urllib2
+                req = urllib2.Request(url=filename)
+                try:
+                    f = urllib2.urlopen(req)
+                except urllib2.HTTPError, e:
+                    self.errorList.append("Could not access %s: %s" % (filename, e.read()))
+                    return
+                except:
+                    self.errorList.append(errorString % filename)
+                    return
+                else:
+                    csv = f
+            else:
+                try:
+                    csv = open(filename, "r")
+                except IOError:
+                    self.errorList.append(errorString % filename)
+                    return
 
             # Check if the stylesheet is accessible
             try:
@@ -1717,7 +2013,7 @@ class S3BulkImporter(object):
                 error = resource.error
                 self.errorList.append("%s - %s: %s" % (
                                       task[3], resource.tablename, error))
-                errors = current.manager.xml.collect_errors(resource)
+                errors = current.xml.collect_errors(resource)
                 if errors:
                     self.errorList.extend(errors)
                 db.rollback()
@@ -1941,7 +2237,7 @@ class S3DateTime(object):
         """
 
         session = current.session
-        xml = current.manager.xml
+        xml = current.xml
 
         if dt and utc:
             offset = IS_UTC_OFFSET.get_offset_value(session.s3.utc_offset)
@@ -1952,6 +2248,488 @@ class S3DateTime(object):
             return xml.encode_local_datetime(dt)
         else:
             return current.messages.NONE
+
+# =============================================================================
+class S3MultiPath:
+    """
+        Simplified path toolkit for managing multi-ancestor-hypergraphs
+        in a relational database.
+
+        MultiPaths allow single-query searches for all ancestors and
+        descendants of a node, as well as single-query affiliation
+        testing - whereas they require multiple writes on update (one
+        per each descendant node), so they should only be used for
+        hypergraphs which rarely change.
+
+        Every node of the hypergraph contains a path attribute, with the
+        following MultiPath-syntax:
+
+        MultiPath: <SimplePath>,<SimplePath>,...
+        SimplePath: [|<Node>|<Node>|...|]
+        Node: ID of the ancestor node
+
+        SimplePaths contain only ancestors, not the node itself.
+
+        SimplePaths contain the ancestors in reverse order, i.e. the nearest
+        ancestor first (this is important because removing a vertex from the
+        path will cut off the tail, not the head)
+
+        A path like A<-B<-C can be constructed like:
+
+            path = S3MultiPath([["C", "B", "A"]])
+            [|C|B|A|]
+
+        Extending this path by a vertex E<-B will result in a multipath like:
+
+            path.extend("B", "E")
+            [|C|B|A|],[|C|B|E|]
+
+        Cutting the vertex A<-B reduces the multipath to:
+
+            path.cut("B", "A")
+            [|C|B|E|]
+
+        Note the reverse notation (nearest ancestor first)!
+
+        MultiPaths will be normalized automatically, i.e.:
+
+            path = S3MultiPath([["C", "B", "A", "D", "F", "B", "E", "G"]])
+            [|C|B|A|D|F|],[|C|B|E|G|]
+    """
+
+    # -------------------------------------------------------------------------
+    # Construction
+    #
+    def __init__(self, paths=None):
+        """ Constructor """
+        self.paths = []
+        if isinstance(paths, S3MultiPath):
+            self.paths = list(paths.paths)
+        else:
+            if paths is None:
+                paths = []
+            elif type(paths) is str:
+                paths = self.__parse(paths)
+            elif not isinstance(paths, (list, tuple)):
+                paths = [paths]
+            append = self.append
+            for p in paths:
+                append(p)
+
+    # -------------------------------------------------------------------------
+    def append(self, path):
+        """
+            Append a new ancestor path to this multi-path
+
+            @param path: the ancestor path
+        """
+        Path = self.Path
+
+        if isinstance(path, Path):
+            path = path.nodes
+        else:
+            path = Path(path).nodes
+        multipath = None
+
+        # Normalize any recurrent paths
+        paths = self.__normalize(path)
+
+        append = self.paths.append
+        for p in paths:
+            p = Path(p)
+            if not self & p:
+                append(p)
+                multipath = self
+        return multipath
+
+    # -------------------------------------------------------------------------
+    def extend(self, head, ancestors=None, cut=None):
+        """
+            Extend this multi-path with a new vertex ancestors<-head
+
+            @param head: the head node
+            @param ancestors: the ancestor (multi-)path of the head node
+        """
+
+        # If ancestors is a multi-path, extend recursively with all paths
+        if isinstance(ancestors, S3MultiPath):
+            extend = self.extend
+            for p in ancestors.paths:
+                extend(head, p, cut=cut)
+            return self
+
+        # Split-extend all paths which contain the head node
+        extensions = []
+        Path = self.Path
+        append = extensions.append
+        for p in self.paths:
+            if cut:
+                pos = p.find(cut)
+                if pos > 0:
+                    p.nodes = p.nodes[:pos-1]
+            i = p.find(head)
+            if i > 0:
+                path = Path(p.nodes[:i]).extend(head, ancestors)
+                detour = None
+                for tail in self.paths:
+                    j = tail.find(path.last())
+                    if j > 0:
+                        # append original tail
+                        detour = Path(path)
+                        detour.extend(path.last(), tail[j:])
+                        append(detour)
+                if not detour:
+                    append(path)
+        self.paths.extend(extensions)
+
+        # Finally, cleanup for duplicate and empty paths
+        return self.clean()
+
+    # -------------------------------------------------------------------------
+    def cut(self, head, ancestor=None):
+        """
+            Cut off the vertex ancestor<-head in this multi-path
+
+            @param head: the head node
+            @param ancestor: the ancestor node to cut off
+        """
+        for p in self.paths:
+            p.cut(head, ancestor)
+        # Must cleanup for duplicates
+        return self.clean()
+
+    # -------------------------------------------------------------------------
+    def clean(self):
+        """
+            Remove any duplicate and empty paths from this multi-path
+        """
+        mp = S3MultiPath(self)
+        pop = mp.paths.pop
+        self.paths = []
+        append = self.paths.append
+        while len(mp):
+            item = pop(0)
+            if len(item) and not mp & item and not self & item:
+                append(item)
+        return self
+
+    # -------------------------------------------------------------------------
+    # Serialization/Deserialization
+    #
+    def __parse(self, value):
+        """ Parse a multi-path-string into nodes """
+        return value.split(",")
+
+    def __repr__(self):
+        """ Serialize this multi-path as string """
+        return ",".join([str(p) for p in self.paths])
+
+    def as_list(self):
+        """ Return this multi-path as list of node lists """
+        return [p.as_list() for p in self.paths if len(p)]
+
+    # -------------------------------------------------------------------------
+    # Introspection
+    #
+    def __len__(self):
+        """ The number of paths in this multi-path """
+        return len(self.paths)
+
+    # -------------------------------------------------------------------------
+    def __and__(self, sequence):
+        """
+            Check whether sequence is the start sequence of any of
+            the paths in this multi-path (for de-duplication)
+
+            @param sequence: sequence of node IDs (or path)
+        """
+        for p in self.paths:
+            if p.startswith(sequence):
+                return 1
+        return 0
+
+    # -------------------------------------------------------------------------
+    def __contains__(self, sequence):
+        """
+            Check whether sequence is contained in any of the paths (can
+            also be used to check whether this multi-path contains a path
+            to a particular node)
+
+            @param sequence: the sequence (or node ID)
+        """
+        for p in self.paths:
+            if sequence in p:
+                return 1
+        return 0
+
+    # -------------------------------------------------------------------------
+    def nodes(self):
+        """ Get all nodes from this path """
+        nodes = []
+        for p in self.paths:
+            n = [i for i in p.nodes if i not in nodes]
+            nodes.extend(n)
+        return nodes
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def all_nodes(paths):
+        """
+            Get all nodes from all paths
+
+            @param paths: list of multi-paths
+        """
+        nodes = []
+        for p in paths:
+            n = [i for i in p.nodes() if i not in nodes]
+            nodes.extend(n)
+        return nodes
+
+    # -------------------------------------------------------------------------
+    # Normalization
+    #
+    @staticmethod
+    def __normalize(path):
+        """
+            Normalize a path into a sequence of non-recurrent paths
+
+            @param path: the path as a list of node IDs
+        """
+        seq = map(str, path)
+        l = zip(seq, seq[1:])
+        if not l:
+            return [path]
+        seq = S3MultiPath.__resolve(seq)
+        pop = seq.pop
+        paths = []
+        append = paths.append
+        while len(seq):
+            p = pop(0)
+            s = paths + seq
+            contained = False
+            lp = len(p)
+            for i in s:
+                if i[:lp] == p:
+                    contained = True
+                    break
+            if not contained:
+                append(p)
+        return paths
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def __resolve(seq):
+        """
+            Resolve a sequence of vertices (=pairs of node IDs) into a
+            sequence of non-recurrent paths
+
+            @param seq: the vertex sequence
+        """
+        resolve = S3MultiPath.__resolve
+        if seq:
+            head = seq[0]
+            tail = seq[1:]
+            tails = []
+            index = tail.index
+            append = tails.append
+            while head in tail:
+                pos = index(head)
+                append(tail[:pos])
+                tail = tail[pos + 1:]
+            append(tail)
+            r = []
+            append = r.append
+            for tail in tails:
+                nt = resolve(tail)
+                for t in nt:
+                    append([head] + t)
+            return r
+        else:
+            return [seq]
+
+    # -------------------------------------------------------------------------
+    # Helper class for simple ancestor paths
+    #
+    class Path:
+
+        # ---------------------------------------------------------------------
+        # Construction methods
+        #
+        def __init__(self, nodes=None):
+            """ Constructor """
+            self.nodes = []
+            if isinstance(nodes, S3MultiPath.Path):
+                self.nodes = list(nodes.nodes)
+            else:
+                if nodes is None:
+                    nodes = []
+                elif type(nodes) is str:
+                    nodes = self.__parse(nodes)
+                elif not isinstance(nodes, (list, tuple)):
+                    nodes = [nodes]
+                append = self.append
+                for n in nodes:
+                    if not append(n):
+                        break
+
+        # ---------------------------------------------------------------------
+        def append(self, node=None):
+            """
+                Append a node to this path
+
+                @param node: the node
+            """
+            if node is None:
+                return True
+            n = str(node)
+            if not n:
+                return True
+            if n not in self.nodes:
+                self.nodes.append(n)
+                return True
+            return False
+
+        # ---------------------------------------------------------------------
+        def extend(self, head, ancestors=None):
+            """
+                Extend this path with a new vertex ancestors<-head, if this
+                path ends at the head node
+
+                @param head: the head node
+                @param ancestors: the ancestor sequence
+            """
+            if ancestors is None:
+                # If no head node is specified, use the first ancestor node
+                path = S3MultiPath.Path(head)
+                head = path.first()
+                ancestors = path.nodes[1:]
+            last = self.last()
+            if last is None or last == str(head):
+                append = self.append
+                path = S3MultiPath.Path(ancestors)
+                for i in path.nodes:
+                    if not append(i):
+                        break
+                return self
+            else:
+                return None
+
+        # ---------------------------------------------------------------------
+        def cut(self, head, ancestor=None):
+            """
+                Cut off the ancestor<-head vertex from this path, retaining
+                the head node
+
+                @param head: the head node
+                @param ancestor: the ancestor node
+
+            """
+            if ancestor is not None:
+                sequence = [str(head), str(ancestor)]
+                pos = self.find(sequence)
+                if pos > 0:
+                    self.nodes = self.nodes[:pos]
+            else:
+                # if ancestor is None and the path starts with head,
+                # then remove the entire path
+                if str(head) == self.first():
+                    self.nodes = []
+            return self
+
+        # ---------------------------------------------------------------------
+        # Serialize/Deserialize
+        #
+        def __repr__(self):
+            """ Represent this path as a string """
+            return "[|%s|]" % "|".join(self.nodes)
+
+        def __parse(self, value):
+            """ Parse a string into nodes """
+            return value.strip().strip("[").strip("]").strip("|").split("|")
+
+        def as_list(self):
+            """ Return the list of nodes """
+            return list(self.nodes)
+
+        # ---------------------------------------------------------------------
+        # Item access
+        #
+        def __getitem__(self, i):
+            """ Get the node at position i """
+            try:
+                return self.nodes.__getitem__(i)
+            except IndexError:
+                return None
+
+        # ---------------------------------------------------------------------
+        def first(self):
+            """ Get the first node in this path (the nearest ancestor) """
+            return self[0]
+
+        # ---------------------------------------------------------------------
+        def last(self):
+            """ Get the last node in this path (the most distant ancestor) """
+            return self[-1]
+
+        # ---------------------------------------------------------------------
+        # Tests
+        #
+        def __contains__(self, sequence):
+            """
+                Check whether this path contains sequence
+
+                @param sequence: sequence of node IDs
+            """
+            if self.find(sequence) != -1:
+                return 1
+            else:
+                return 0
+
+        # ---------------------------------------------------------------------
+        def __len__(self):
+            """
+                Get the number of nodes in this path
+            """
+            return len(self.nodes)
+
+        # ---------------------------------------------------------------------
+        def find(self, sequence):
+            """
+                Find a sequence of node IDs in this path
+
+                @param sequence: sequence of node IDs (or path)
+                @returns: position of the sequence (index+1), 0 if the path
+                          is empty, -1 if the sequence wasn't found
+            """
+            path = S3MultiPath.Path(sequence)
+            sequence = path.nodes
+            nodes = self.nodes
+            if not sequence:
+                return -1
+            if not nodes:
+                return 0
+            head, tail = sequence[0], sequence[1:]
+            pos = 0
+            l = len(tail)
+            index = nodes.index
+            while head in nodes[pos:]:
+                pos = index(head, pos) + 1
+                if not tail or nodes[pos:pos+l] == tail:
+                    return pos
+            return -1
+
+        # ---------------------------------------------------------------------
+        def startswith(self, sequence):
+            """
+                Check whether this path starts with sequence
+
+                @param sequence: sequence of node IDs (or path)
+            """
+            sequence = S3MultiPath.Path(sequence).nodes
+            if self.nodes[0:len(sequence)] == sequence:
+                return True
+            else:
+                return False
 
 # =============================================================================
 class Traceback(object):

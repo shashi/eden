@@ -60,7 +60,6 @@ except ImportError:
     raise
 
 # =============================================================================
-
 class S3XML(S3Codec):
     """
         XML toolkit for S3XRC
@@ -140,6 +139,7 @@ class S3XML(S3Codec):
         table="table",
         field="field",
         value="value",
+        alias="alias",
         resource="resource",
         ref="ref",
         domain="domain",
@@ -185,11 +185,8 @@ class S3XML(S3Codec):
     def __init__(self):
         """ Constructor """
 
-        manager = current.manager
-
-        self.domain = manager.domain
+        self.domain = current.manager.domain
         self.error = None
-
         self.filter_mci = False # Set to true to suppress export at MCI<0
 
     # XML+XSLT tools ==========================================================
@@ -318,7 +315,8 @@ class S3XML(S3Codec):
              url=None,
              start=None,
              limit=None,
-             results=None):
+             results=None,
+             maxbounds=False):
         """
             Builds a S3XML tree from a list of elements
 
@@ -329,6 +327,7 @@ class S3XML(S3Codec):
             @param start: the start record (in server-side pagination)
             @param limit: the page size (in server-side pagination)
             @param results: number of total available results
+            @param maxbounds: include maximum Geo-boundaries (lat/lon min/max)
         """
 
         # For now we do not nsmap, because the default namespace cannot be
@@ -358,16 +357,17 @@ class S3XML(S3Codec):
             set(ATTRIBUTE.domain, self.domain)
         if url:
             set(ATTRIBUTE.url, current.response.s3.base_url)
-        # @ToDo: This should be done based on the features, not just the config
-        bounds = current.gis.get_bounds()
-        set(ATTRIBUTE.latmin,
-            str(bounds["min_lat"]))
-        set(ATTRIBUTE.latmax,
-            str(bounds["max_lat"]))
-        set(ATTRIBUTE.lonmin,
-            str(bounds["min_lon"]))
-        set(ATTRIBUTE.lonmax,
-            str(bounds["max_lon"]))
+        if maxbounds:
+            # @ToDo: This should be done based on the features, not just the config
+            bounds = current.gis.get_bounds()
+            set(ATTRIBUTE.latmin,
+                str(bounds["min_lat"]))
+            set(ATTRIBUTE.latmax,
+                str(bounds["max_lat"]))
+            set(ATTRIBUTE.lonmin,
+                str(bounds["min_lon"]))
+            set(ATTRIBUTE.lonmax,
+                str(bounds["max_lon"]))
         return etree.ElementTree(root)
 
     # -------------------------------------------------------------------------
@@ -629,11 +629,8 @@ class S3XML(S3Codec):
             @param locations: locations dict
         """
 
-        gis = current.gis
-        if not gis:
-            return
-
         db = current.db
+        gis = current.gis
         s3db = current.s3db
         request = current.request
         settings = current.deployment_settings
@@ -652,14 +649,14 @@ class S3XML(S3Codec):
         popup_url = None
         tooltips = None
         marker_url = None
+        symbol = None
         if locations:
             latlons = locations.get("latlons", None)
             geojsons = locations.get("geojsons", None)
             wkts = locations.get("wkts", None)
             popup_url = locations.get("popup_url", None)
             tooltips = locations.get("tooltips", None)
-            symbol = None
-        elif marker:
+        if marker and format == "kml":
             _marker = marker.get("image", None)
             if _marker:
                 # Quicker to download Icons from Static
@@ -669,12 +666,15 @@ class S3XML(S3Codec):
                     (settings.get_base_public_url(),
                      request.application)
                 marker_url = "%s/%s" % (download_url, _marker)
-            symbol = marker.get("gps_marker", gis.DEFAULT_SYMBOL)
-        else:
-            symbol = gis.DEFAULT_SYMBOL
+        if format == "gpx":
+            if marker:
+                symbol = marker.get("gps_marker", gis.DEFAULT_SYMBOL)
+            else:
+                symbol = gis.DEFAULT_SYMBOL
 
         table = resource.table
         tablename = resource.tablename
+        pkey = table._id
 
         references = []
         for r in rmap:
@@ -697,30 +697,30 @@ class S3XML(S3Codec):
             LatLon = None
             polygon = False
             # Use the value calculated in gis.get_geojson_and_popup/get_geojson_theme if we can
-            if latlons:
-                LatLon = latlons[tablename].get(record.id, None)
+            if latlons and tablename in latlons:
+                LatLon = latlons[tablename].get(record[pkey], None)
                 if LatLon:
                     lat = LatLon[0]
                     lon = LatLon[1]
-            elif geojsons:
+            elif geojsons and tablename in geojsons:
                 polygon = True
-                geojson = geojsons[tablename].get(record.id, None)
+                geojson = geojsons[tablename].get(record[pkey], None)
                 if geojson:
                     # Output the GeoJSON directly into the XML, so that XSLT can simply drop in
                     geometry = etree.SubElement(element, "geometry")
                     geometry.set("value", geojson)
-            elif wkts:
+            elif wkts and tablename in wkts:
                 # Nothing gets here currently
                 # tbc: KML Polygons (or we should also do these outside XSLT)
                 polygon = True
-                wkt = wkts[tablename][record.id]
+                wkt = wkts[tablename][record[pkey]]
                 # Convert the WKT in XSLT
                 attr[ATTRIBUTE.wkt] = wkt
             elif "polygons" in request.get_vars:
                 # Calculate the Polygons 1/feature since we didn't do it earlier
                 # - no current case for this
                 if WKTFIELD in fields:
-                    query = (ktable.id == r_id)
+                    query = (ktable._id == r_id)
                     if settings.get_gis_spatialdb():
                         if format == "geojson":
                             # Do the Simplify & GeoJSON direct from the DB
@@ -777,7 +777,6 @@ class S3XML(S3Codec):
                 attr[ATTRIBUTE.lat] = "%.4f" % lat
                 attr[ATTRIBUTE.lon] = "%.4f" % lon
                 if marker_url:
-                    # Don't add a marker if Feature Layer/Resource with this set 1/layer
                     attr[ATTRIBUTE.marker] = marker_url
                 if symbol:
                     attr[ATTRIBUTE.sym] = symbol
@@ -793,19 +792,19 @@ class S3XML(S3Codec):
                     # Assume being used within the Sahana Mapping client so use local URLs
                     # to keep filesize down
                     try:
-                        url = "%s/%i.plain" % (url, record.id)
+                        url = "%s/%i.plain" % (url, record[pkey])
                     except:
                         # This is a Super-Entity without an id
                         url = ""
                 else:
                     # Assume being used outside the Sahana Mapping client so use public URLs
-                    url = "%s%s/%i" % (settings.get_base_public_url(), url, record.id)
+                    url = "%s%s/%i" % (settings.get_base_public_url(), url, record[pkey])
                 attr[ATTRIBUTE.url] = url
 
                 if tooltips and tablename in tooltips:
                     # Feature Layer / Resource
                     # Retrieve the HTML for the onHover Tooltip
-                    tooltip = tooltips[tablename][record.id]
+                    tooltip = tooltips[tablename][record[pkey]]
                     try:
                         # encode suitable for use as XML attribute
                         tooltip = self.xml_encode(tooltip).decode("utf-8")
@@ -815,7 +814,11 @@ class S3XML(S3Codec):
                         attr[ATTRIBUTE.popup] = tooltip
 
     # -------------------------------------------------------------------------
-    def resource(self, parent, table, record,
+    def resource(self,
+                 parent,
+                 table,
+                 record,
+                 alias=None,
                  fields=[],
                  postprocess=None,
                  url=None):
@@ -825,9 +828,10 @@ class S3XML(S3Codec):
             @param parent: the parent element in the document tree
             @param table: the database table
             @param record: the record
+            @param alias: the resource alias (for disambiguation of components)
             @param fields: list of field names to include
             @param postprocess: post-process hook (function to process
-                <resource> elements after compilation)
+                                <resource> elements after compilation)
             @param url: URL of the record
         """
 
@@ -843,6 +847,7 @@ class S3XML(S3Codec):
 
         ATTRIBUTE = self.ATTRIBUTE
         NAME = ATTRIBUTE.name
+        ALIAS = ATTRIBUTE.alias
         FIELD = ATTRIBUTE.field
         VALUE = ATTRIBUTE.value
         URL = ATTRIBUTE.url
@@ -859,6 +864,8 @@ class S3XML(S3Codec):
             elem = etree.Element(RESOURCE)
         attrib = elem.attrib
         attrib[NAME] = tablename
+        if alias:
+            attrib[ALIAS] = alias
 
         # UID
         if UID in table.fields and UID in record:
@@ -942,7 +949,6 @@ class S3XML(S3Codec):
                     attr[URL] = fileurl
                     attr[ATTRIBUTE.filename] = filename
             elif fieldtype == "password":
-                # Do not export password fields
                 data = SubElement(elem, DATA)
                 data.attrib[FIELD] = f
                 data.text = v
@@ -1296,9 +1302,8 @@ class S3XML(S3Codec):
                 ftype = str(field.type)
                 if ftype[:9] == "reference":
                     ktablename = ftype[10:]
-                    current.manager.load(ktablename)
                     try:
-                        ktable = current.db[ktablename]
+                        ktable = current.s3db[ktablename]
                     except:
                         pass
                     else:
@@ -1864,7 +1869,10 @@ class S3XML(S3Codec):
                         e = encoding
                         break
         try:
-            reader = csv.DictReader(utf_8_encode(source),
+            import StringIO
+            if not isinstance(source, StringIO.StringIO):
+                source = utf_8_encode(source)
+            reader = csv.DictReader(source,
                                     delimiter=delimiter,
                                     quotechar=quotechar)
             for r in reader:

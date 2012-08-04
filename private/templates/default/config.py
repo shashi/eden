@@ -300,6 +300,8 @@ settings.L10n.decimal_separator = "."
 #settings.hrm.email_required = False
 # Uncomment to allow HR records to be deletable rather than just marking them as obsolete
 #settings.hrm.deletable = True
+# Uncomment to allow HRs to have multiple Job Roles in addition to their Job Title
+#settings.hrm.job_roles = True
 # Uncomment to hide the Staff resource
 #settings.hrm.show_staff = False
 # Uncomment to allow hierarchical categories of Skills, which each need their own set of competency levels.
@@ -531,27 +533,39 @@ settings.modules = OrderedDict([
            #audit_read = True,     # Can enable Audit for just an individual module here
            #audit_write = True
        )),
-    ("mpr", Storage(
-           name_nice = T("Missing Person Registry"),
-           #description = "Helps to report and search for missing persons",
-           restricted = True,
-           module_type = 10,
-       )),
     ("dvr", Storage(
            name_nice = T("Disaster Victim Registry"),
            #description = "Allow affected individuals & households to register to receive compensation and distributions",
            restricted = True,
            module_type = 10,
        )),
-    #("scenario", Storage(
-    #        name_nice = T("Scenarios"),
-    #        #description = "Define Scenarios for allocation of appropriate Resources (Human, Assets & Facilities).",
+    #("mpr", Storage(
+    #       name_nice = T("Missing Person Registry"),
+    #       #description = "Helps to report and search for missing persons",
+    #       restricted = True,
+    #       module_type = 10,
+    #   )),
+    #("stats", Storage(
+    #        name_nice = T("Statistics"),
+    #        #description = "Manages statistics",
+    #        restricted = True,
+    #        module_type = None,
+    #    )),
+    #("vulnerability", Storage(
+    #        name_nice = T("Vulnerability"),
+    #        #description = "Manages vulnerability indicators",
     #        restricted = True,
     #        module_type = 10,
     #    )),
     #("event", Storage(
     #        name_nice = T("Events"),
     #        #description = "Activate Events (e.g. from Scenario templates) for allocation of appropriate Resources (Human, Assets & Facilities).",
+    #        restricted = True,
+    #        module_type = 10,
+    #    )),
+    #("scenario", Storage(
+    #        name_nice = T("Scenarios"),
+    #        #description = "Define Scenarios for allocation of appropriate Resources (Human, Assets & Facilities).",
     #        restricted = True,
     #        module_type = 10,
     #    )),

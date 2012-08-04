@@ -49,7 +49,7 @@ def register_onaccept(form):
     """ Tasks to be performed after a new user registers """
 
     # Add newly-registered users to Person Registry, add 'Authenticated' role
-    # If Organisation is provided, then: add HRM record & add to 'Org_X_Access' role
+    # If Organisation is provided, then add HRM record
     person_id = auth.s3_register(form)
 
     if form.vars.organisation_id and not settings.get_hrm_show_staff():
@@ -153,11 +153,11 @@ def index():
                             (appname, settings.get_template())
         try:
             exec("import %s as custom" % controller)
-        except ImportError:
+        except ImportError, e:
             # No Custom Page available, continue with the default
             page = "private/templates/%s/controllers.py" % \
                         settings.get_template()
-            s3base.s3_debug("File not loadable: %s" % page)
+            s3base.s3_debug("File not loadable: %s, %s" % (page, e.message))
         else:
             if page in custom.__dict__:
                 exec ("output = custom.%s()()" % page)
@@ -172,7 +172,7 @@ def index():
             exec("import %s as custom" % controller)
         except ImportError, e:
             # No Custom Page available, continue with the default
-            # @ToDo: cache this result - at least in session, ideally in class startup
+            # @ToDo: cache this result in session
             s3base.s3_debug("Custom homepage cannot be loaded: %s" % e.message)
         else:
             if "index" in custom.__dict__:
@@ -215,7 +215,6 @@ def index():
                 #["dec", T("Gap Report"), "project", "gap_report"],
                 ["dec", T("Requests"), "req", "req"],
                 ["res", T("Projects"), "project", "project"],
-                ["res", T("Activities"), "project", "activity"],
                 ["res", T("Commitments"), "req", "commit"],
                 ["res", T("Sent Shipments"), "inv", "send"],
                 ["res", T("Received Shipments"), "inv", "recv"]
@@ -443,7 +442,7 @@ def organisation():
     s3.dataTable_sDom = "rtip" #"frtip" - filter broken
     s3.dataTable_iDisplayLength = 25
 
-    s3mgr.configure("org_organisation",
+    s3db.configure("org_organisation",
                     listadd = False,
                     addbtn = True,
                     super_entity = db.pr_pentity,
@@ -457,7 +456,7 @@ def site():
     """
         @todo: Avoid redirect
     """
-    s3mgr.load("org_site")
+    s3db.table("org_site")
     if len(request.args):
         site_id = request.args[0]
         site_r = db.org_site[site_id]

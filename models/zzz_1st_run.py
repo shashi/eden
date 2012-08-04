@@ -113,19 +113,27 @@ if len(pop_list) > 0:
 
         # Send Messages from Outbox
         # SMS every minute
-        s3task.schedule_task("process_outbox",
+        s3task.schedule_task("msg_process_outbox",
                              vars={"contact_method":"SMS"},
                              period=120,  # seconds
                              timeout=120, # seconds
                              repeats=0    # unlimited
-                            )
+                             )
         # Emails every 5 minutes
-        s3task.schedule_task("process_outbox",
+        s3task.schedule_task("msg_process_outbox",
                              vars={"contact_method":"EMAIL"},
                              period=300,  # seconds
                              timeout=300, # seconds
                              repeats=0    # unlimited
-                            )
+                             )
+
+    # Daily maintenance
+    s3task.schedule_task("maintenance",
+                         vars={"period":"daily"},
+                         period=86400, # seconds, so 1/day
+                         timeout=600,  # seconds
+                         repeats=0     # unlimited
+                         )
 
     # =========================================================================
     # Import PrePopulate data
@@ -226,16 +234,16 @@ if len(pop_list) > 0:
     bi = s3base.S3BulkImporter()
 
     s3.import_role = bi.import_role
-    
+
     # Disable table protection
     protected = s3mgr.PROTECTED
     s3mgr.PROTECTED = []
 
     # Additional settings for user table imports:
-    s3mgr.configure("auth_user",
+    s3db.configure("auth_user",
                     onaccept = lambda form: \
                         auth.s3_link_to_person(user=form.vars))
-    s3mgr.model.add_component("auth_membership", auth_user="user_id")
+    s3db.add_component("auth_membership", auth_user="user_id")
 
     # Allow population via shell scripts
     if not request.env.request_method:

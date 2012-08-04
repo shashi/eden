@@ -7,7 +7,7 @@
 module = request.controller
 resourcename = request.function
 
-if not deployment_settings.has_module(module):
+if not settings.has_module(module):
     raise HTTP(404, body="Module disabled: %s" % module)
 
 # -----------------------------------------------------------------------------
@@ -17,7 +17,7 @@ def index():
         - custom View
     """
 
-    module_name = deployment_settings.modules[module].name_nice
+    module_name = settings.modules[module].name_nice
     response.title = module_name
     return dict(module_name=module_name)
 
@@ -63,19 +63,12 @@ def req():
                                                                         "site":s3db.org_site_represent(site_id, show_link=False)
                                                                         })
 
-    default_type = request.vars.default_type
-    if default_type:
-        type_field = req_table.type
-        type_field.default = int(default_type)
-        type_field.writable = False
-
     def prep(r):
 
         s3db.req_prep(r)
 
         # Remove type from list_fields
-        list_fields = s3mgr.model.get_config("req_req",
-                                             "list_fields")
+        list_fields = s3db.get_config("req_req", "list_fields")
         try:
             list_fields.remove("type")
         except:
@@ -83,7 +76,7 @@ def req():
              # This can happen if the req controller is called
              # for a second time, such as when printing reports
             pass
-        s3mgr.configure("req_req", list_fields=list_fields)
+        s3db.configure("req_req", list_fields=list_fields)
 
         if r.interactive:
             # Set Fields and Labels depending on type
@@ -97,7 +90,7 @@ def req():
                 req_table.type.readable = False
                 req_table.type.writable = False
 
-                crud_strings = deployment_settings.get_req_req_crud_strings(type)
+                crud_strings = settings.get_req_req_crud_strings(type)
                 if crud_strings:
                     s3.crud_strings["req_req"] = crud_strings
 
@@ -135,7 +128,7 @@ def req():
                     # - includes one embedded in list_create
                     # - list_fields over-rides, so still visible within list itself
                     s3db.req_create_form_mods()
-                    s3mgr.configure(s3db.req_req,
+                    s3db.configure(s3db.req_req,
                                     create_next = URL(c="req",
                                                       f="req",
                                                       args=["[id]",
@@ -179,7 +172,7 @@ def req():
         if r.component and r.component.name == "commit":
             table = r.component.table
             # Allow commitments to be added when doing so as a component
-            s3mgr.configure(table,
+            s3db.configure(table,
                             listadd = True)
 
             type = r.record.type
@@ -189,7 +182,7 @@ def req():
                                           error_msg=T("You do not have permission for any facility to make a commitment."))
                 if r.interactive:
                     # Redirect to the Items tab after creation
-                    s3mgr.configure(table,
+                    s3db.configure(table,
                                     create_next = URL(c="req", f="commit",
                                                       args=["[id]", "commit_item"]),
                                     update_next = URL(c="req", f="commit",
@@ -214,7 +207,7 @@ def req():
                 table.site_id.writable = False
                 if r.interactive and r.record.type == 3: # People
                     # Redirect to the Persons tab after creation
-                    s3mgr.configure(table,
+                    s3db.configure(table,
                                     create_next = URL(c="req", f="commit",
                                                       args=["[id]", "commit_person"]),
                                     update_next = URL(c="req", f="commit",
@@ -284,8 +277,8 @@ def req():
 def req_item():
     """ REST Controller """
 
-    s3mgr.configure("req_req_item",
-                    insertable=False)
+    s3db.configure("req_req_item",
+                   insertable=False)
 
     def prep(r):
         if r.interactive:
@@ -446,8 +439,8 @@ def commit():
         table.person_id.writable = False
         # & can only make single-person commitments
         # (This should have happened in the main commitment)
-        s3mgr.configure(tablename,
-                        insertable=False)
+        s3db.configure(tablename,
+                       insertable=False)
 
     def prep(r):
 
@@ -477,7 +470,7 @@ def commit():
 
         if r.component:
             req_id = r.record.req_id
-            if r.component.name == "item":
+            if r.component.name == "commit_item":
                 # Limit commit items to items from the request
                 s3db.req_commit_item.req_item_id.requires = \
                     IS_ONE_OF(db,
@@ -494,7 +487,7 @@ def commit():
                 #db.req_commit_skill.req_skill_id.requires = \
                 #    IS_ONE_OF(db,
                 #              "req_req_skill.id",
-                #              s3.req_skill_represent,
+                #              s3db.req_skill_represent,
                 #              orderby = "req_req_skill.id",
                 #              filterby = "req_id",
                 #              filter_opts = [req_id],
@@ -542,12 +535,12 @@ def commit_rheader(r):
                                           ),
                                          ),
                                         )
-                prepare_btn = A( T("Prepare Commitment"),
+                prepare_btn = A( T("Send Commitment"),
                               _href = URL(c = "inv",
-                                          f = "prepare_commit",
+                                          f = "send_commit",
                                           args = [record.id]
                                           ),
-                              _id = "prepare_commit",
+                              _id = "send_commit",
                               _class = "action-btn"
                               )
 
@@ -630,8 +623,7 @@ def commit_req():
     site_id = request.vars.get("site_id")
 
     # User must have permissions over facility which is sending
-    (prefix, resourcename, id) = s3mgr.model.get_instance(s3db.org_site,
-                                                          site_id)
+    (prefix, resourcename, id) = s3db.get_instance(s3db.org_site, site_id)
     if not site_id or not auth.s3_has_permission("update",
                                                  "%s_%s" % (prefix,
                                                             resourcename),
@@ -715,8 +707,7 @@ def send_req():
     site_id = request.vars.get("site_id")
 
     # User must have permissions over facility which is sending
-    (prefix, resourcename, id) = s3mgr.model.get_instance(db.org_site,
-                                                          site_id)
+    (prefix, resourcename, id) = s3db.get_instance(db.org_site, site_id)
     if not site_id or not auth.s3_has_permission("update",
                                                  "%s_%s" % (prefix,
                                                             resourcename),
@@ -819,15 +810,15 @@ def commit_item_json():
             (ctable.id == itable.commit_id) & \
             (ctable.site_id == stable.id) & \
             (itable.deleted == False)
-    records =  db(query).select(ctable.id,
-                                ctable.date,
-                                stable.name,
-                                itable.quantity,
-                                orderby = db.req_commit.date)
+    records = db(query).select(ctable.id,
+                               ctable.date,
+                               stable.name,
+                               itable.quantity,
+                               orderby = db.req_commit.date)
 
-    json_str = "[%s,%s" % ( json.dumps(dict(id = str(T("Committed")),
-                                            quantity = "#")),
-                            records.json()[1:])
+    json_str = '''[%s,%s''' % (json.dumps(dict(id = str(T("Committed")),
+                                               quantity = "#")),
+                               records.json()[1:])
 
     response.headers["Content-Type"] = "application/json"
     return json_str

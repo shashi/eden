@@ -29,8 +29,7 @@
     OTHER DEALINGS IN THE SOFTWARE.
 """
 
-__all__ = [
-           "S3ReusableField",
+__all__ = ["S3ReusableField",
            "s3_uid",
            "s3_meta_deletion_status",
            "s3_meta_deletion_fk",
@@ -41,7 +40,7 @@ __all__ = [
            "s3_meta_fields",
            "s3_all_meta_field_names",   # Used by GIS
            "s3_role_required",          # Used by GIS
-           "s3_roles_permitted",        # Used by CMS
+           "s3_roles_permitted",        # Used by CMS (in future)
            "s3_lx_fields",
            "s3_lx_onvalidation",
            "s3_lx_update",
@@ -51,9 +50,11 @@ __all__ = [
            "s3_address_update",
            "s3_comments",
            "s3_currency",
+           "s3_date",
+           "s3_datetime",
            ]
 
-from datetime import datetime
+import datetime
 from uuid import uuid4
 
 from gluon import *
@@ -65,8 +66,10 @@ from gluon import *
 from gluon.dal import Query, SQLCustomType
 from gluon.storage import Storage
 
-from s3utils import s3_auth_user_represent, s3_auth_group_represent
-
+from s3utils import S3DateTime, s3_auth_user_represent, s3_auth_group_represent
+from s3validators import IS_ONE_OF, IS_UTC_DATETIME
+from s3widgets import S3AutocompleteWidget, S3DateWidget, S3DateTimeWidget
+    
 try:
     db = current.db
 except:
@@ -274,13 +277,13 @@ def s3_deletion_status():
 s3_meta_created_on = S3ReusableField("created_on", "datetime",
                                      readable=False,
                                      writable=False,
-                                     default=lambda: datetime.utcnow())
+                                     default=lambda: datetime.datetime.utcnow())
 
 s3_meta_modified_on = S3ReusableField("modified_on", "datetime",
                                       readable=False,
                                       writable=False,
-                                      default=lambda: datetime.utcnow(),
-                                      update=lambda: datetime.utcnow())
+                                      default=lambda: datetime.datetime.utcnow(),
+                                      update=lambda: datetime.datetime.utcnow())
 
 def s3_timestamp():
     return (s3_meta_created_on(),
@@ -400,9 +403,6 @@ def s3_role_required():
         - used by GIS for map layer permissions management
     """
 
-    from s3validators import IS_ONE_OF
-    from s3widgets import S3AutocompleteWidget
-
     T = current.T
     db = current.db
     f = S3ReusableField("role_required", db.auth_group,
@@ -469,6 +469,7 @@ def s3_roles_permitted(name="roles_permitted", **attr):
 #
 # These fields are populated onaccept from location_id
 # - for many reads to fewer writes, this is faster than Virtual Fields
+# - @ToDO: No need for virtual fields - replace with simple joins
 #
 # Labels that vary by country are set by gis.update_table_hierarchy_labels()
 #
@@ -748,6 +749,8 @@ def s3_comments(name="comments", **attr):
     T = current.T
     if "label" not in attr:
         attr["label"] = T("Comments")
+    if "represent" not in attr:
+        attr["represent"] = lambda comments: comments or current.messages.NONE
     if "widget" not in attr:
         attr["widget"] = s3_comments_widget
     if "comment" not in attr:
@@ -786,6 +789,291 @@ def s3_currency(name="currency", **attr):
 
     f = S3ReusableField(name, length=3,
                         **attr)
+    return f()
+
+# =============================================================================
+# Date field
+#
+
+def s3_date(name="date", **attr):
+    """
+        Return a standard Date field
+
+        Additional options to normal S3ResuableField:
+            default == "now" (in addition to usual meanings)
+            past = x months
+            future = x months
+    """
+
+    if "past" in attr:
+        past = attr["past"]
+        del attr["past"]
+    else:
+        past = None
+    if "future" in attr:
+        future = attr["future"]
+        del attr["future"]
+    else:
+        future = None
+
+    if "default" in attr and attr["default"] == "now":
+        attr["default"] = current.request.utcnow
+    if "label" not in attr:
+        attr["label"] = current.T("Date")
+    if "represent" not in attr:
+        attr["represent"] = lambda d: S3DateTime.date_represent(d, utc=True)
+    if "requires" not in attr:
+        if past is None and future is None:
+            requires = IS_DATE(
+                    format=current.deployment_settings.get_L10n_date_format()
+                )
+        else:
+            now = current.request.utcnow.date()
+            current_month = now.month
+            if past is None:
+                future_month = now.month + future
+                if future_month <= 12:
+                    max = now.replace(month=future_month)
+                else:
+                    current_year = now.year
+                    years = int(future_month/12)
+                    future_year = current_year + years
+                    future_month = future_month - (years * 12)
+                    max = now.replace(year=future_year,
+                                      month=future_month)
+                requires = IS_DATE_IN_RANGE(
+                        format=current.deployment_settings.get_L10n_date_format(),
+                        maximum=max,
+                        error_message=current.T("Date must be %(max)s or earlier!")
+                    )
+            elif future is None:
+                if past < current_month:
+                    min = now.replace(month=current_month - past)
+                else:
+                    current_year = now.year
+                    past_years = int(past/12)
+                    past_months = past - (past_years * 12)
+                    min = now.replace(year=current_year - past_years,
+                                      month=current_month - past_months)
+                requires = IS_DATE_IN_RANGE(
+                        format=current.deployment_settings.get_L10n_date_format(),
+                        minimum=min,
+                        error_message=current.T("Date must be %(min)s or later!")
+                    )
+            else:
+                future_month = now.month + future
+                if future_month < 13:
+                    max = now.replace(month=future_month)
+                else:
+                    current_year = now.year
+                    years = int(future_month/12)
+                    future_year = now.year + years
+                    future_month = future_month - (years * 12)
+                    max = now.replace(year=future_year,
+                                      month=future_month)
+                if past < current_month:
+                    min = now.replace(month=current_month - past)
+                else:
+                    current_year = now.year
+                    past_years = int(past/12)
+                    past_months = past - (past_years * 12)
+                    min = now.replace(year=current_year - past_years,
+                                      month=current_month - past_months)
+                requires = IS_DATE_IN_RANGE(
+                        format=current.deployment_settings.get_L10n_date_format(),
+                        maximum=max,
+                        minimum=min,
+                        error_message=current.T("Date must be between %(min)s and %(max)s!")
+                    )
+        if "empty" in attr:
+            if attr["empty"] is False:
+                attr["requires"] = requires
+            else:
+                attr["requires"] = IS_EMPTY_OR(requires)
+            del attr["empty"]
+        else:
+            # Default
+            attr["requires"] = IS_EMPTY_OR(requires)
+    if "widget" not in attr:
+        if past is None and future is None:
+            attr["widget"] = S3DateWidget()
+        elif past is None:
+            attr["widget"] = S3DateWidget(future=future)
+        elif future is None:
+            attr["widget"] = S3DateWidget(past=past)
+        else:
+            attr["widget"] = S3DateWidget(past=past, future=future)
+
+    f = S3ReusableField(name, "date", **attr)
+    return f()
+
+# =============================================================================
+# Datetime field
+#
+
+def s3_datetime(name="date", **attr):
+    """
+        Return a standard Datetime field
+
+        Additional options to normal S3ResuableField:
+            default = "now" (in addition to usual meanings)
+            represent = "date" (in addition to usual meanings)
+            widget = "date" (in addition to usual meanings)
+            past = x hours
+            future = x hours
+    """
+
+    if "past" in attr:
+        past = attr["past"]
+        del attr["past"]
+    else:
+        past = None
+    if "future" in attr:
+        future = attr["future"]
+        del attr["future"]
+    else:
+        future = None
+
+    if "default" in attr and attr["default"] == "now":
+        attr["default"] = current.request.utcnow
+    if "label" not in attr:
+        attr["label"] = current.T("Date")
+    if "represent" not in attr:
+        attr["represent"] = lambda dt: S3DateTime.datetime_represent(dt, utc=True)
+    elif attr["represent"] == "date":
+        attr["represent"] = lambda dt: S3DateTime.date_represent(dt, utc=True)
+
+    if "widget" not in attr:
+        if past is None and future is None:
+            attr["widget"] = S3DateTimeWidget()
+        elif past is None:
+            attr["widget"] = S3DateTimeWidget(future=future)
+        elif future is None:
+            attr["widget"] = S3DateTimeWidget(past=past)
+        else:
+            attr["widget"] = S3DateTimeWidget(past=past, future=future)
+    elif attr["widget"] == "date":
+        if past is None and future is None:
+            attr["widget"] = S3DateWidget()
+            requires = IS_DATE(
+                    format=current.deployment_settings.get_L10n_date_format()
+                )
+        else:
+            now = current.request.utcnow.date()
+            current_month = now.month
+            if past is None:
+                future = int(round(future/744.0, 0))
+                attr["widget"] = S3DateWidget(future=future)
+                future_month = now.month + future
+                if future_month <= 12:
+                    max = now.replace(month=future_month)
+                else:
+                    current_year = now.year
+                    years = int(future_month/12)
+                    future_year = current_year + years
+                    future_month = future_month - (years * 12)
+                    max = now.replace(year=future_year,
+                                      month=future_month)
+                requires = IS_DATE_IN_RANGE(
+                        format=current.deployment_settings.get_L10n_date_format(),
+                        maximum=max,
+                        error_message=current.T("Date must be %(max)s or earlier!")
+                    )
+            elif future is None:
+                past = int(round(past/744.0, 0))
+                attr["widget"] = S3DateWidget(past=past)
+                if past < current_month:
+                    min = now.replace(month=current_month - past)
+                else:
+                    current_year = now.year
+                    past_years = int(past/12)
+                    past_months = past - (past_years * 12)
+                    min = now.replace(year=current_year - past_years,
+                                      month=current_month - past_months)
+                requires = IS_DATE_IN_RANGE(
+                        format=current.deployment_settings.get_L10n_date_format(),
+                        minimum=min,
+                        error_message=current.T("Date must be %(min)s or later!")
+                    )
+            else:
+                future = int(round(future/744.0, 0))
+                past = int(round(past/744.0, 0))
+                attr["widget"] = S3DateWidget(past=past, future=future)
+                future_month = now.month + future
+                if future_month < 13:
+                    max = now.replace(month=future_month)
+                else:
+                    current_year = now.year
+                    years = int(future_month/12)
+                    future_year = now.year + years
+                    future_month = future_month - (years * 12)
+                    max = now.replace(year=future_year,
+                                      month=future_month)
+                if past < current_month:
+                    min = now.replace(month=current_month - past)
+                else:
+                    current_year = now.year
+                    past_years = int(past/12)
+                    past_months = past - (past_years * 12)
+                    min = now.replace(year=current_year - past_years,
+                                      month=current_month - past_months)
+                requires = IS_DATE_IN_RANGE(
+                        format=current.deployment_settings.get_L10n_date_format(),
+                        maximum=max,
+                        minimum=min,
+                        error_message=current.T("Date must be between %(min)s and %(max)s!")
+                    )
+        if "empty" in attr:
+            if attr["empty"] is False:
+                attr["requires"] = requires
+            else:
+                attr["requires"] = IS_EMPTY_OR(requires)
+            del attr["empty"]
+        else:
+            # Default
+            attr["requires"] = IS_EMPTY_OR(requires)
+
+    if "requires" not in attr:
+        if past is None and future is None:
+            requires = IS_UTC_DATETIME(
+                    format=current.deployment_settings.get_L10n_datetime_format()
+                )
+        else:
+            now = current.request.utcnow
+            if past is None:
+                max = now + datetime.timedelta(hours=future)
+                requires = IS_UTC_DATETIME(
+                        format=current.deployment_settings.get_L10n_datetime_format(),
+                        maximum=max,
+                        error_message=current.T("Date must be %(max)s or earlier!")
+                    )
+            elif future is None:
+                min = now - datetime.timedelta(hours=past)
+                requires = IS_UTC_DATETIME(
+                        format=current.deployment_settings.get_L10n_datetime_format(),
+                        minimum=min,
+                        error_message=current.T("Date must be %(min)s or later!")
+                    )
+            else:
+                min = now - datetime.timedelta(hours=past)
+                max = now + datetime.timedelta(hours=future)
+                requires = IS_UTC_DATETIME(
+                        format=current.deployment_settings.get_L10n_datetime_format(),
+                        maximum=max,
+                        minimum=min,
+                        error_message=current.T("Date must be between %(min)s and %(max)s!")
+                    )
+        if "empty" in attr:
+            if attr["empty"] is False:
+                attr["requires"] = requires
+            else:
+                attr["requires"] = IS_EMPTY_OR(requires)
+            del attr["empty"]
+        else:
+            # Default
+            attr["requires"] = IS_EMPTY_OR(requires)
+
+    f = S3ReusableField(name, "datetime", **attr)
     return f()
 
 # END =========================================================================

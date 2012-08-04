@@ -12,8 +12,8 @@ function addLayers() {
     /* Base Layers */
     // OSM
     if (S3.gis.layers_osm) {
-        for (i = 0; i < S3.gis.layers_osm.length; i++) {
-            addOSMLayer(S3.gis.layers_osm[i]);
+        for (i = S3.gis.layers_osm.length; i > 0; i--) {
+            addOSMLayer(S3.gis.layers_osm[i - 1]);
         }
     }
     // Google
@@ -28,20 +28,20 @@ function addLayers() {
     }
     // TMS
     if (S3.gis.layers_tms) {
-        for (i = 0; i < S3.gis.layers_tms.length; i++) {
-            addTMSLayer(S3.gis.layers_tms[i]);
+        for (i = S3.gis.layers_tms.length; i > 0; i--) {
+            addTMSLayer(S3.gis.layers_tms[i - 1]);
         }
     }
     // WMS
     if (S3.gis.layers_wms) {
-        for (i = 0; i < S3.gis.layers_wms.length; i++) {
-            addWMSLayer(S3.gis.layers_wms[i]);
+        for (i = S3.gis.layers_wms.length; i > 0; i--) {
+            addWMSLayer(S3.gis.layers_wms[i - 1]);
         }
     }
     // XYZ
     if (S3.gis.layers_xyz) {
-        for (i = 0; i < S3.gis.layers_xyz.length; i++) {
-            addXYZLayer(S3.gis.layers_xyz[i]);
+        for (i = S3.gis.layers_xyz.length; i > 0; i--) {
+            addXYZLayer(S3.gis.layers_xyz[i - 1]);
         }
     }
     // Empty
@@ -67,26 +67,26 @@ function addLayers() {
     /* Overlays */
     // Theme
     if (S3.gis.layers_theme) {
-        for (i = 0; i < S3.gis.layers_theme.length; i++) {
-            addGeoJSONLayer(S3.gis.layers_theme[i]);
+        for (i = S3.gis.layers_theme.length; i > 0; i--) {
+            addGeoJSONLayer(S3.gis.layers_theme[i - 1]);
         }
     }
     // GeoJSON
     if (S3.gis.layers_geojson) {
-        for (i = 0; i < S3.gis.layers_geojson.length; i++) {
-            addGeoJSONLayer(S3.gis.layers_geojson[i]);
+        for (i = S3.gis.layers_geojson.length; i > 0; i--) {
+            addGeoJSONLayer(S3.gis.layers_geojson[i - 1]);
         }
     }
     // GPX
     if (S3.gis.layers_gpx) {
-        for (i = 0; i < S3.gis.layers_gpx.length; i++) {
-            addGPXLayer(S3.gis.layers_gpx[i]);
+        for (i = S3.gis.layers_gpx.length; i > 0; i--) {
+            addGPXLayer(S3.gis.layers_gpx[i - 1]);
         }
     }
     // ArcGIS REST
     if (S3.gis.layers_arcrest) {
-        for (i = 0; i < S3.gis.layers_arcrest.length; i++) {
-            addArcRESTLayer(S3.gis.layers_arcrest[i]);
+        for (i = S3.gis.layers_arcrest.length; i > 0; i--) {
+            addArcRESTLayer(S3.gis.layers_arcrest[i - 1]);
         }
     }
     // CoordinateGrid
@@ -95,8 +95,8 @@ function addLayers() {
     }
     // GeoRSS
     if (S3.gis.layers_georss) {
-        for (i = 0; i < S3.gis.layers_georss.length; i++) {
-            addGeoJSONLayer(S3.gis.layers_georss[i]);
+        for (i = S3.gis.layers_georss.length; i > 0; i--) {
+            addGeoJSONLayer(S3.gis.layers_georss[i - 1]);
         }
     }
     // KML
@@ -106,32 +106,36 @@ function addLayers() {
             extractAttributes: true,
             maxDepth: 2
         })
-        for (i = 0; i < S3.gis.layers_kml.length; i++) {
-            addKMLLayer(S3.gis.layers_kml[i]);
+        for (i = S3.gis.layers_kml.length; i > 0; i--) {
+            addKMLLayer(S3.gis.layers_kml[i - 1]);
         }
+    }
+    // OpenWeatherMap
+    if (S3.gis.OWM) {
+        addOWMLayers();
     }
     // WFS
     if (S3.gis.layers_wfs) {
-        for (i = 0; i < S3.gis.layers_wfs.length; i++) {
-            addWFSLayer(S3.gis.layers_wfs[i]);
+        for (i = S3.gis.layers_wfs.length; i > 0; i--) {
+            addWFSLayer(S3.gis.layers_wfs[i - 1]);
         }
     }
     // Feature Queries from Mapping API
     if (S3.gis.layers_feature_queries) {
-        for (i = 0; i < S3.gis.layers_feature_queries.length; i++) {
-            addGeoJSONLayer(S3.gis.layers_feature_queries[i]);
+        for (i = S3.gis.layers_feature_queries.length; i > 0; i--) {
+            addGeoJSONLayer(S3.gis.layers_feature_queries[i - 1]);
         }
     }
     // Feature Resources (e.g. Search Results))
     if (S3.gis.layers_feature_resources) {
-        for (i = 0; i < S3.gis.layers_feature_resources.length; i++) {
-            addGeoJSONLayer(S3.gis.layers_feature_resources[i]);
+        for (i = S3.gis.layers_feature_resources.length; i > 0; i--) {
+            addGeoJSONLayer(S3.gis.layers_feature_resources[i - 1]);
         }
     }
     // Feature Layers from Catalogue
     if (S3.gis.layers_features) {
-        for (i = 0; i < S3.gis.layers_features.length; i++) {
-            addGeoJSONLayer(S3.gis.layers_features[i]);
+        for (i = S3.gis.layers_features.length; i > 0; i--) {
+            addGeoJSONLayer(S3.gis.layers_features[i - 1]);
         }
     }
     // Draft Layers
@@ -1306,6 +1310,54 @@ function osm_getTileURL(bounds) {
             url = this.selectUrl(path, url);
         }
         return url + path;
+    }
+}
+
+// OpenWeatherMap
+function addOWMLayers() {
+    var owm = S3.gis.OWM;
+    var layer;
+    if (owm.station) {
+        layer = new OpenLayers.Layer.Vector.OWMStations(
+            owm.station.name,
+            {dir: owm.station.dir,
+             // This is used to Save State
+             s3_layer_id: owm.station.id,
+             s3_layer_type: 'openweathermap'
+            }
+        );
+        layer.setVisibility(owm.city.visibility);
+        layer.events.on({
+            'featureselected': layer.onSelect,
+            'featureunselected': layer.onUnselect,
+            'loadstart': showThrobber,
+            'loadend': hideThrobber,
+            'loadcancel': hideThrobber
+        });
+        map.addLayer(layer);
+        // Ensure Highlight & Popup Controls act on this layer
+        S3.gis.layers_all.push(layer);
+    }
+    if (owm.city) {
+        layer = new OpenLayers.Layer.Vector.OWMWeather(
+            owm.city.name,
+            {dir: owm.station.dir,
+             // This is used to Save State
+             s3_layer_id: owm.city.id,
+             s3_layer_type: 'openweathermap'
+            }
+        );
+        layer.setVisibility(owm.city.visibility);
+        layer.events.on({
+            'featureselected': layer.onSelect,
+            'featureunselected': layer.onUnselect,
+            'loadstart': showThrobber,
+            'loadend': hideThrobber,
+            'loadcancel': hideThrobber
+        });
+        map.addLayer(layer);
+        // Ensure Highlight & Popup Controls act on this layer
+        S3.gis.layers_all.push(layer);
     }
 }
 

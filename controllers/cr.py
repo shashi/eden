@@ -110,7 +110,7 @@ def shelter():
                                filter_opts=("pr_person",
                                             "pr_group"))
 
-    s3mgr.configure("pr_presence",
+    s3db.configure("pr_presence",
                     # presence not deletable in this view! (need to register a check-out
                     # for the same person instead):
                     deletable=False,
@@ -122,10 +122,10 @@ def shelter():
                                 ])
 
     # Access from Shelters
-    s3mgr.model.add_component("pr_presence",
+    s3db.add_component("pr_presence",
                               cr_shelter="shelter_id")
 
-    s3mgr.configure(tablename,
+    s3db.configure(tablename,
                     # Go to People check-in for this shelter after creation
                     create_next = URL(c="cr", f="shelter",
                                       args=["[id]", "presence"]))
@@ -148,11 +148,8 @@ def cr_shelter_prep(r):
         r.resource.add_filter(s3db.pr_presence.closed == False)
 
     if r.interactive:
-        if r.method != "read":
-            # Don't want to see in Create forms
-            # inc list_create (list_fields over-rides)
-            s3base.s3_address_hide(r.table)
-
+        if r.id:
+            s3db.cr_shelter.obsolete.readable = s3db.cr_shelter.obsolete.writable = True
         if r.component:
             if r.component.name == "inv_item" or \
                r.component.name == "recv" or \
@@ -163,9 +160,12 @@ def cr_shelter_prep(r):
             elif r.component.name == "human_resource":
                 # Filter out people which are already staff for this warehouse
                 s3base.s3_filter_staff(r)
+                # Make it clear that this is for adding new staff, not assigning existing
+                s3.crud_strings.hrm_human_resource.label_create_button = T("Add New Staff Member")
                 # Cascade the organisation_id from the hospital to the staff
-                s3db.hrm_human_resource.organisation_id.default = r.record.organisation_id
-                s3db.hrm_human_resource.organisation_id.writable = False
+                field = s3db.hrm_human_resource.organisation_id
+                field.default = r.record.organisation_id
+                field.writable = False
 
             elif r.component.name == "rat":
                 # Hide the Implied fields

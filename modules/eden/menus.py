@@ -645,16 +645,22 @@ class S3OptionsMenu(object):
         return M()(
                     M("Scenarios", c="scenario", f="scenario")(
                         M("New", m="create"),
+                        M("Import", m="import", p="create"),
                         M("View All"),
                     ),
                     M("Events", c="event", f="event")(
                         M("New", m="create"),
-                        M("View All")
+                        M("View All"),
                     ),
-                    M("Incidents", c="incident", f="event")(
+                    M("Incidents", c="event", f="incident")(
                         M("New", m="create"),
-                        M("View All")
-                    )
+                        M("View All"),
+                    ),
+                    M("Incident Types", c="event", f="incident_type")(
+                        M("New", m="create"),
+                        M("Import", m="import", p="create"),
+                        M("View All"),
+                    ),
                 )
 
     # -------------------------------------------------------------------------
@@ -808,7 +814,9 @@ class S3OptionsMenu(object):
         personal_mode = lambda i: s3.hrm.mode is not None
         is_org_admin = lambda i: s3.hrm.orgs and True or \
                                  ADMIN in s3.roles
-        use_teams = lambda i: current.deployment_settings.get_hrm_use_teams()
+        settings = current.deployment_settings
+        job_roles = lambda i: settings.get_hrm_job_roles()
+        use_teams = lambda i: settings.get_hrm_use_teams()
 
         return M(c="hrm")(
                     M("Staff", f="staff",
@@ -825,6 +833,11 @@ class S3OptionsMenu(object):
                         M("List All"),
                     ),
                     M("Job Role Catalog", f="job_role",
+                      check=[manager_mode, job_roles])(
+                        M("New", m="create"),
+                        M("List All"),
+                    ),
+                    M("Job Title Catalog", f="job_title",
                       check=manager_mode)(
                         M("New", m="create"),
                         M("List All"),
@@ -888,10 +901,16 @@ class S3OptionsMenu(object):
                                  ADMIN in s3.roles
 
         settings = current.deployment_settings
+        job_roles = lambda i: settings.get_hrm_job_roles()
         show_programmes = lambda i: settings.get_hrm_vol_experience() == "programme"
         show_tasks = lambda i: settings.has_module("project") and \
                                settings.get_project_mode_task()
         use_teams = lambda i: settings.get_hrm_use_teams()
+
+        if job_roles(""):
+            jt_catalog_label = "Job Title Catalog"
+        else:
+            jt_catalog_label = "Volunteer Role Catalog"
 
         return M(c="vol")(
                     M("Volunteers", f="volunteer",
@@ -908,6 +927,11 @@ class S3OptionsMenu(object):
                         M("List All"),
                     ),
                     M("Job Role Catalog", f="job_role",
+                      check=[manager_mode, job_roles])(
+                        M("New", m="create"),
+                        M("List All"),
+                    ),
+                    M(jt_catalog_label, f="job_title",
                       check=manager_mode)(
                         M("New", m="create"),
                         M("List All"),
@@ -980,7 +1004,7 @@ class S3OptionsMenu(object):
         return M()(
                     #M("Home", f="index"),
                     M("Warehouses", c="inv", f="warehouse")(
-                        M("Add Warehouse", m="create"),
+                        M("New", m="create"),
                         M("List All"),
                         M("Search", m="search"),
                         M("Import", m="import", p="create"),
@@ -1006,17 +1030,17 @@ class S3OptionsMenu(object):
                           m="search", vars=dict(report="rel")),
                     ),
                     M(inv_recv_list, c="inv", f="recv")(
-                        M("Add Received/Incoming Shipment", m="create"),
+                        M("New", m="create"),
                         M("List All"),
                         M("Search", m="search"),
                     ),
                     M("Sent Shipments", c="inv", f="send")(
-                        M("Add Sent Shipment", m="create"),
+                        M("New", m="create"),
                         M("List All"),
                         M("Search Shipped Items", f="track_item", m="search"),
                     ),
                     M("Items", c="supply", f="item")(
-                        M("Add Item", m="create"),
+                        M("New", m="create"),
                         M("List All"),
                         M("Search", f="catalog_item", m="search"),
                     ),
@@ -1027,7 +1051,7 @@ class S3OptionsMenu(object):
                        #M("Search", m="search"),
                     #),
                     M("Catalogs", c="supply", f="catalog")(
-                        M("Add Catalog", m="create"),
+                        M("New", m="create"),
                         M("List All"),
                         #M("Search", m="search"),
                     ),
@@ -1036,8 +1060,19 @@ class S3OptionsMenu(object):
                         M("New", m="create"),
                         M("List All"),
                     ),
+                    M("Suppliers", c="inv", f="supplier")(
+                        M("New", m="create"),
+                        M("List All"),
+                        M("Search", m="search"),
+                        M("Import", m="import", p="create"),
+                    ),
+                    M("Facilities", c="inv", f="facility")(
+                        M("New", m="create"),
+                        M("List All"),
+                        #M("Search", m="search"),
+                    ),
                     M("Requests", c="req", f="req")(
-                        M("Request Items", m="create"),
+                        M("New", m="create"),
                         M("List All"),
                         M("Requested Items", f="req_item"),
                         #M("Search Requested Items", f="req_item", m="search"),
@@ -1389,7 +1424,7 @@ class S3OptionsMenu(object):
                         M("List All Community Contacts", f="community_contact"),
                         M("Search Community Contacts", f="community_contact",
                           m="search"),
-                     )
+                     ),
                     )
             else:
                 menu(
@@ -1401,8 +1436,8 @@ class S3OptionsMenu(object):
                      )
                     )
             menu(
-                 M("Reports", f="report")(
-                    M("Who is doing What Where", f="location", m="report"),
+                 M("Reports", f="location", m="report")(
+                    M("3W", f="location", m="report"),
                     M("Beneficiaries", f="beneficiary", m="report"),
                     M("Funding", f="organisation", args="report"),
                  ),
@@ -1414,6 +1449,12 @@ class S3OptionsMenu(object):
                     M(IMPORT, f="location",
                       m="import", p="create"),
                  ),
+                M("Partner Orgnisations",  f="partners")(
+                    M("New", m="create"),
+                    M("List All"),
+                    M("Search", m="search"),
+                    M("Import", m="import", p="create"),
+                ),
                  M("Themes", f="theme")(
                     M("New", m="create"),
                     M("List All"),
@@ -1508,7 +1549,7 @@ class S3OptionsMenu(object):
 
         return M(c="req")(
                     M("Requests", f="req")(
-                        M("Add Request", m="create"),
+                        M("New", m="create"),
                         M("List All"),
                         M("List All Requested Items", f="req_item"),
                         M("List All Requested Skills", f="req_skill",
@@ -1517,6 +1558,24 @@ class S3OptionsMenu(object):
                     ),
                     M("Commitments", f="commit", check=use_commit)(
                         M("List All")
+                    ),
+                )
+
+    # -------------------------------------------------------------------------
+    def stats(self):
+        """ Statistics """
+
+        return M(c="stats")(
+                    M("Demographics", f="demographic")(
+                        M("New", m="create"),
+                        M("List All"),
+                        #M("Search", m="search"),
+                    ),
+                    M("Demographic Data", f="demographic_data")(
+                        M("New", m="create"),
+                        M("Import", m="import"),
+                        M("List All"),
+                        #M("Search", m="search"),
                     ),
                 )
 
@@ -1542,6 +1601,24 @@ class S3OptionsMenu(object):
                         M("New", m="create"),
                         M("List All"),
                         M("Search", m="search"),
+                    ),
+                )
+
+    # -------------------------------------------------------------------------
+    def vulnerability(self):
+        """ Vulnerability """
+
+        return M(c="vulnerability")(
+                    M("Indicators", f="indicator")(
+                        M("New", m="create"),
+                        M("List All"),
+                        #M("Search", m="search"),
+                    ),
+                    M("Data", f="data")(
+                        M("New", m="create"),
+                        M("Import", m="import"),
+                        M("List All"),
+                        #M("Search", m="search"),
                     ),
                 )
 
@@ -1588,9 +1665,13 @@ class S3OptionsMenu(object):
         # and should therefore perhaps be replaced by a real path-check in
         # the main menu?
         if controller != "default":
-            breadcrumbs(
-                layout(all_modules[controller].name_nice, c=controller)
-            )
+            try:
+                breadcrumbs(
+                    layout(all_modules[controller].name_nice, c=controller)
+                )
+            except:
+                # Module not defined
+                pass
 
         # This checks the path in the options menu, omitting the top-level item
         # (because that's the menu itself which doesn't have a linked label):

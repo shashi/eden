@@ -9,6 +9,8 @@ except ImportError:
     pass
 import eden.menus as default
 
+red_cross_filter = {"organisation.organisation_type_id$name" : "Red Cross / Red Crescent"}
+
 # =============================================================================
 class S3MainMenu(default.S3MainMenu):
     """ Custom Application Main Menu """
@@ -43,7 +45,8 @@ class S3MainMenu(default.S3MainMenu):
                     vars=dict(group="staff"))(
                 MM("Staff", c="hrm", f="staff"),
                 #MM("Teams", c="hrm", f="group"),
-                MM("Organizations", c="org", f="organisation"),
+                MM("National Societies", c="org", f="organisation",
+                    vars = red_cross_filter),
                 MM("Offices", c="org", f="office"),
                 MM("Job Roles", c="hrm", f="job_role"),
                 #MM("Skill List", c="hrm", f="skill"),
@@ -108,14 +111,14 @@ class S3MainMenu(default.S3MainMenu):
                     DB("Manage Volunteer Data", f="volunteer"),
                     DB("Manage Teams Data", f="group"),
                 ),
-                DB("CATALOGUES",
+                DB("CATALOGS",
                     c="hrm",
                     image="graphic_catalogue.png",
-                    title="Catalogues")(
+                    title="Catalogs")(
                     DB("Certificates", f="certificate"),
                     DB("Training Courses", f="course"),
                     #DB("Skills", f="skill"),
-                    DB("Job Roles", f="job_role")
+                    DB("Job Roles", f="job_title")
                 ))
         elif request.controller in ("hrm", "org"):
             dashboard = DB()(
@@ -131,16 +134,16 @@ class S3MainMenu(default.S3MainMenu):
                     image = "graphic_office.png",
                     title = "Offices")(
                     DB("Manage Offices Data", f="office"),
-                    DB("Manage Organisations Data", f="organisation"),
+                    DB("Manage National Society Data", f="organisation"),
                 ),
-                DB("CATALOGUES",
+                DB("CATALOGS",
                     c="hrm",
                     image="graphic_catalogue.png",
-                    title="Catalogues")(
+                    title="Catalogs")(
                     DB("Certificates", f="certificate"),
                     DB("Training Courses", f="course"),
                     #DB("Skills", f="skill"),
-                    DB("Job Roles", f="job_role")
+                    DB("Job Roles", f="job_title")
                 ))
 
         elif request.controller == "default" and request.function == "index":
@@ -268,12 +271,14 @@ class S3OptionsMenu(default.S3OptionsMenu):
                         # M("New Team", m="create"),
                         # M("List All"),
                     # ),
-                    M("Organizations", c="org", f="organisation",
+                    M("National Societies", c="org", 
+                                            f="organisation",
+                                            vars = red_cross_filter,
                       check=manager_mode)(
-                        M("New", m="create"),
-                        M("List All"),
-                        M("Search", m="search"),
-                        #M("Import", m="import", p="create")
+                        M("New", m="create",vars = red_cross_filter,),
+                        M("List All", vars = red_cross_filter,),
+                        M("Search", m="search", vars = red_cross_filter,),
+                        M("Import", m="import", p="create", check=is_org_admin)
                     ),
                     M("Offices", c="org", f="office",
                       check=manager_mode)(
@@ -282,7 +287,7 @@ class S3OptionsMenu(default.S3OptionsMenu):
                         M("Search", m="search"),
                         M("Import", m="import", p="create"),
                     ),
-                    M("Job Role Catalog", c="hrm", f="job_role",
+                    M("Job Role Catalog", c="hrm", f="job_title",
                       check=manager_mode)(
                         M("New Job Role", m="create"),
                         M("List All"),
@@ -363,13 +368,20 @@ class S3OptionsMenu(default.S3OptionsMenu):
 
         # Same as HRM
         return self.hrm()
+    
+    # -------------------------------------------------------------------------
+    def req(self):
+        """ Organisation Management """
 
+        # Same as Inventory
+        return self.inv()
     # -------------------------------------------------------------------------
     def event(self):
         """ Event Management """
 
         # Same as IRS
         return self.irs()
+    
 
 # END =========================================================================
 

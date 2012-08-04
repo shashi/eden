@@ -39,8 +39,8 @@ def role():
     name = "group"
 
     # ACLs as component of roles
-    s3mgr.model.add_component(auth.permission.table,
-                              auth_group="group_id")
+    s3db.add_component(auth.permission.table,
+                       auth_group="group_id")
 
     def prep(r):
         if r.representation != "html":
@@ -59,26 +59,91 @@ def role():
         r.set_handler("update", handler)
         r.set_handler("delete", handler)
         return True
-    response.s3.prep = prep
+    s3.prep = prep
 
-    response.s3.stylesheets.append( "S3/role.css" )
+    s3.stylesheets.append( "S3/role.css" )
     output = s3_rest_controller(module, name)
     return output
 
+# -----------------------------------------------------------------------------
+def user_onaccept(form):
+    """
+        Update HRM record, if-present
+    """
+
+    vars = form.vars
+    user_id = vars.id
+    organisation_id = vars.organisation_id
+
+    if organisation_id:
+        htable = s3db.table("hrm_human_resource")
+        if htable:
+            # Update HRM record
+            site_id = vars.site_id
+            ptable = s3db.pr_person
+            ltable = s3db.pr_person_user
+            query = (htable.deleted == False) & \
+                    (htable.status == 1) & \
+                    (htable.person_id == ptable.id) & \
+                    (ptable.pe_id == ltable.pe_id) & \
+                    (ltable.user_id == user_id)
+            rows = db(query).select(htable.id,
+                                    limitby=(0, 2))
+            if len(rows) == 1:
+                # We know which record we can update
+                hr_id = rows.first().id
+                db(htable.id == hr_id).update(organisation_id = organisation_id,
+                                              site_id = site_id)
+                # Update record ownership
+                auth.s3_set_record_owner(htable, hr_id, force_update=True)
+                # Update Site link
+                hstable = s3db.hrm_human_resource_site
+                query = (hstable.human_resource_id == hr_id)
+                this = db(query).select(hstable.id,
+                                        limitby=(0, 1)).first()
+                if this:
+                    db(query).update(site_id=site_id,
+                                     human_resource_id=id)
+                else:
+                    hstable.insert(site_id=site_id,
+                                   human_resource_id=hr_id)
+
+        # Update link to organisation
+        ltable = s3db.org_organisation_user
+        query = (ltable.user_id == user_id)
+        rows = db(query).select(ltable.organisation_id,
+                                limitby=(0, 2))
+        if len(rows) == 1:
+            if rows.first().organisation_id != organisation_id:
+                # We know which record we can update
+                db(query).update(organisation_id=organisation_id)
+            # No more action required
+            return
+        elif rows:
+            query = query & (ltable.organisation_id == organisation_id)
+            rows = db(query).select(ltable.id,
+                                    limitby=(0, 2)).first()
+            if len(rows) == 1:
+                # No action required
+                return
+        # Insert a new one
+        ltable.insert(user_id=user_id,
+                      organisation_id=organisation_id)
 
 # -----------------------------------------------------------------------------
 @auth.s3_requires_membership(1)
 def user():
     """ RESTful CRUD controller """
 
-    module = "auth"
     tablename = "auth_user"
     table = db[tablename]
 
-    s3mgr.configure(tablename,
-                    main="first_name",
-                    # Add users to Person Registry & 'Authenticated' role:
-                    create_onaccept = auth.s3_register)
+    s3db.configure(tablename,
+                   main="first_name",
+                   # Add users to Person Registry & 'Authenticated' role:
+                   create_onaccept = auth.s3_register,
+                   update_onaccept = user_onaccept,
+                   )
 
     def disable_user(r):
         if not r.id:
@@ -116,14 +181,14 @@ def user():
 
     # Custom Methods
     role_manager = s3base.S3RoleManager()
-    set_method = s3mgr.model.set_method
-    set_method(module, resourcename, method="roles",
+    set_method = s3db.set_method
+    set_method("auth", "user", method="roles",
                action=role_manager)
 
-    set_method(module, resourcename, method="disable",
+    set_method("auth", "user", method="disable",
                action=disable_user)
 
-    set_method(module, resourcename, method="approve",
+    set_method("auth", "user", method="approve",
                action=approve_user)
 
     # CRUD Strings
@@ -169,17 +234,21 @@ def user():
                        _title="%s|%s|%s" % (T("Facility"),
                                             T("The default Facility for which this person is acting."),
                                             T("Enter some characters to bring up a list of possible matches")))
+    # Show comments
+    comments = table.comments
+    comments.readable = comments.writable = True
+
     # Pre-processor
     def prep(r):
         if r.interactive:
-            s3mgr.configure(r.tablename,
-                            deletable=False,
-                            # jquery.validate is clashing with dataTables so don't embed the create form in with the List
-                            listadd=False,
-                            addbtn=True,
-                            sortby = [[2, "asc"], [1, "asc"]],
-                            # Password confirmation
-                            create_onvalidation = user_create_onvalidation)
+            s3db.configure(r.tablename,
+                           deletable=False,
+                           # jquery.validate is clashing with dataTables so don't embed the create form in with the List
+                           listadd=False,
+                           addbtn=True,
+                           sortby = [[2, "asc"], [1, "asc"]],
+                           # Password confirmation
+                           create_onvalidation = user_create_onvalidation)
 
             # Allow the ability for admin to Disable logins
             reg = r.table.registration_key
@@ -198,19 +267,19 @@ def user():
             if r.id == session.auth.user.id: # we're trying to delete ourself
                 request.get_vars.update({"user.id":str(r.id)})
                 r.id = None
-                s3mgr.configure(r.tablename,
-                                delete_next = URL(c="default", f="user/logout"))
+                s3db.configure(r.tablename,
+                               delete_next = URL(c="default", f="user/logout"))
                 s3.crud.confirm_delete = T("You are attempting to delete your own account - are you sure you want to proceed?")
 
         elif r.method == "update":
             # Send an email to user if their account is approved
             # (=moved from 'pending' to 'blank'(i.e. enabled))
-            s3mgr.configure(r.tablename,
-                            onvalidation = lambda form: user_approve(form))
+            s3db.configure(r.tablename,
+                           onvalidation = lambda form: user_approve(form))
         if r.http == "GET" and not r.method:
             session.s3.cancel = r.url()
         return True
-    response.s3.prep = prep
+    s3.prep = prep
 
     def postp(r, output):
         # Only show the disable button if the user is not currently disabled
@@ -218,54 +287,52 @@ def user():
                 (r.table.registration_key != "pending")
         rows = db(query).select(r.table.id)
         restrict = [str(row.id) for row in rows]
-        response.s3.actions = [
-                                dict(label=str(UPDATE), _class="action-btn",
-                                     url=URL(c="admin", f="user",
-                                             args=["[id]", "update"])),
-                                dict(label=str(T("Roles")), _class="action-btn",
-                                     url=URL(c="admin", f="user",
-                                             args=["[id]", "roles"])),
-                                dict(label=str(T("Disable")), _class="action-btn",
-                                     url=URL(c="admin", f="user",
-                                             args=["[id]", "disable"]),
-                                     restrict = restrict)
-                              ]
+        s3.actions = [
+                        dict(label=str(UPDATE), _class="action-btn",
+                             url=URL(c="admin", f="user",
+                                     args=["[id]", "update"])),
+                        dict(label=str(T("Roles")), _class="action-btn",
+                             url=URL(c="admin", f="user",
+                                     args=["[id]", "roles"])),
+                        dict(label=str(T("Disable")), _class="action-btn",
+                             url=URL(c="admin", f="user",
+                                     args=["[id]", "disable"]),
+                             restrict = restrict)
+                      ]
         # Only show the approve button if the user is currently pending
         query = (r.table.registration_key == "pending")
         rows = db(query).select(r.table.id)
         restrict = [str(row.id) for row in rows]
-        response.s3.actions.append(
+        s3.actions.append(
                 dict(label=str(T("Approve")), _class="action-btn",
                      url=URL(c="admin", f="user",
                              args=["[id]", "approve"]),
                      restrict = restrict)
             )
         # Add some highlighting to the rows
-        query = (r.table.registration_key == "disabled")
-        rows = db(query).select(r.table.id)
-        response.s3.dataTableStyleDisabled = [str(row.id) for row in rows]
-        response.s3.dataTableStyleWarning = [str(row.id) for row in rows]
-        query = (r.table.registration_key == "pending")
-        rows = db(query).select(r.table.id)
-        response.s3.dataTableStyleAlert = [str(row.id) for row in rows]
+        rtable = r.table
+        query = (rtable.registration_key.belongs(["disabled", "pending"]))
+        rows = db(query).select(rtable.id,
+                                rtable.registration_key)
+        s3.dataTableStyleDisabled = s3.dataTableStyleWarning = [str(row.id) for row in rows if row.registration_key == "disabled"]
+        s3.dataTableStyleAlert = [str(row.id) for row in rows if row.registration_key == "pending"]
 
         # Translate the status values
-        values = [dict(col=7, key="", display=str(T("Active"))),
-                  dict(col=7, key="None", display=str(T("Active"))),
-                  dict(col=7, key="pending", display=str(T("Pending"))),
-                  dict(col=7, key="disabled", display=str(T("Disabled")))
+        values = [dict(col=6, key="", display=str(T("Active"))),
+                  dict(col=6, key="None", display=str(T("Active"))),
+                  dict(col=6, key="pending", display=str(T("Pending"))),
+                  dict(col=6, key="disabled", display=str(T("Disabled")))
                  ]
-        response.s3.dataTableDisplay = values
+        s3.dataTableDisplay = values
 
         # Add client-side validation
         s3base.s3_register_validation()
 
         return output
-    response.s3.postp = postp
+    s3.postp = postp
 
-    output = s3_rest_controller(module, resourcename)
+    output = s3_rest_controller("auth", resourcename)
     return output
-
 
 # =============================================================================
 def group():
@@ -277,10 +344,10 @@ def group():
     tablename = "auth_group"
 
     if not auth.s3_has_role(ADMIN):
-        s3mgr.configure(tablename,
-                        editable=False,
-                        insertable=False,
-                        deletable=False)
+        s3db.configure(tablename,
+                       editable=False,
+                       insertable=False,
+                       deletable=False)
 
     # CRUD Strings
     ADD_ROLE = T("Add Role")
@@ -298,7 +365,7 @@ def group():
         msg_record_deleted = T("Role deleted"),
         msg_list_empty = T("No Roles currently defined"))
 
-    s3mgr.configure(tablename, main="role")
+    s3db.configure(tablename, main="role")
     return s3_rest_controller("auth", resourcename)
 
 # -----------------------------------------------------------------------------
@@ -373,7 +440,6 @@ def user_approve(form):
         else:
             return
 
-
 # =============================================================================
 @auth.s3_requires_membership(1)
 def acl():
@@ -414,13 +480,13 @@ def acl():
     table.oacl.represent = lambda val: acl_represent(val,
                                                      auth.permission.PERMISSION_OPTS)
 
-    s3mgr.configure(tablename,
-        create_next = URL(r=request),
-        update_next = URL(r=request))
+    s3db.configure(tablename,
+                   create_next = URL(r=request),
+                   update_next = URL(r=request))
 
     if "_next" in request.vars:
         next = request.vars._next
-        s3mgr.configure(tablename, delete_next=next)
+        s3db.configure(tablename, delete_next=next)
 
     output = s3_rest_controller(module, name)
     return output
@@ -609,7 +675,7 @@ def create_portable_app(web2py_source, copy_database=False, copy_uploads=False):
 
     if copy_database:
         # Copy the db for the portable app
-        s3mgr.model.load_all_models() # Load all modules to copy everything
+        s3db.load_all_models() # Load all modules to copy everything
 
         portable_db = DAL("sqlite://storage.db", folder=os.path.join(appdir, "databases"))
         for table in db:

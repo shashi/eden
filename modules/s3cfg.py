@@ -32,7 +32,7 @@
 
 __all__ = ["S3Config"]
 
-from gluon import current
+from gluon import current, URL
 from gluon.storage import Storage
 
 from gluon.contrib.simplejson.ordered_dict import OrderedDict
@@ -144,7 +144,11 @@ class S3Config(Storage):
             return False
 
     def get_auth_openid(self):
+        """ Use OpenID for Authentication """
         return self.auth.get("openid", False)
+    def get_auth_login_next(self):
+        """ Which page to go to after login """
+        return self.auth.get("login_next", URL(c="default", f="index"))
     def get_auth_registration_requires_verification(self):
         return self.auth.get("registration_requires_verification", False)
     def get_auth_registration_requires_approval(self):
@@ -185,6 +189,16 @@ class S3Config(Storage):
         else:
             organisation_id = None
         return organisation_id
+    def get_auth_registration_pending(self):
+        """ Message someone gets when they register & they need approving """
+        return self.auth.get("registration_pending",
+            "Registration is still pending approval from Approver (%s) - please wait until confirmation received." % \
+                self.get_mail_approver())
+    def get_auth_registration_pending_approval(self):
+        """ Message someone gets when they register & they need approving """
+        return self.auth.get("registration_pending_approval",
+            "Thank you for validating your email. Your user account is still pending for approval by the system administator (%s). You will get a notification by email when your account is activated." % \
+                self.get_mail_approver())
     def get_auth_registration_requests_image(self):
         """ Have the registration form request an Image """
         return self.auth.get("registration_requests_image", False)
@@ -198,7 +212,7 @@ class S3Config(Storage):
         return self.auth.get("always_notify_approver", True)
     def get_auth_record_approval(self):
         """ Use record approval (False by default) """
-        return self.auth.get("record_approcal", False)
+        return self.auth.get("record_approval", False)
     def get_auth_record_approver_role(self):
         """ UID of the record approver role """
         return self.auth.get("record_approver_role", "APPROVER")
@@ -619,7 +633,7 @@ class S3Config(Storage):
             selecting languages. These values should conform to RFC 3066.
 
             For a full list of languages and their codes, see:
-                http://www.i18nguy.com/unicode/language-identifiers.html 
+                http://www.i18nguy.com/unicode/language-identifiers.html
         """
 
         return self.cap.get("languages",
@@ -645,6 +659,12 @@ class S3Config(Storage):
             If set to True then HRM records are deletable rather than just being able to be marked as obsolete
         """
         return self.hrm.get("deletable", False)
+
+    def get_hrm_job_roles(self):
+        """
+            If set to True then HRs can have multiple Job Roles in addition to their Job Title
+        """
+        return self.hrm.get("job_roles", False)
 
     def get_hrm_show_staff(self):
         """
@@ -699,6 +719,12 @@ class S3Config(Storage):
             Whether Human Resources should show Education
         """
         return self.hrm.get("use_education", False)
+    
+    def get_hrm_organisation_label(self):
+        """
+            Label for Organisations in Human Resources
+        """
+        return self.hrm.get("organisation_label", current.T("Organization"))
 
     # -------------------------------------------------------------------------
     # Inventory Management Settings
@@ -712,6 +738,7 @@ class S3Config(Storage):
         """
         T = current.T
         return self.inv.get("item_status", {
+                0: current.messages.NONE,
                 1: T("Dump"),
                 2: T("Sale"),
                 3: T("Reject"),
@@ -733,7 +760,7 @@ class S3Config(Storage):
         """
         return self.inv.get("shipment_type", {
                 0 : current.messages.NONE,
-                11: current.T("Internal"),
+                11: current.T("Internal Shipment"),
             })
 
     def get_inv_send_types(self):
@@ -750,11 +777,10 @@ class S3Config(Storage):
         """
         T = current.T
         return self.inv.get("recv_type", {
-                31: T("Other Warehouse"),
-                32: T("Local Donation"),
-                33: T("Foreign Donation"),
-                34: T("Local Purchases"),
-                35: T("Confiscated Goods from Bureau Of Customs")
+                #31: T("Other Warehouse"), Same as Internal Shipment
+                32: T("Donation"),
+                #33: T("Foreign Donation"),
+                34: T("Purchase"),
            })
 
     def get_inv_send_form_name(self):
