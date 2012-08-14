@@ -217,5 +217,9 @@ def template():
     s3.stylesheets.append("S3/cap.css")
     return s3db.cap_template_controller()
 
+def profile():
+    """ REST controller for cap profile """
+    return s3db.cap_profile_controller()
+
 
 # END =========================================================================

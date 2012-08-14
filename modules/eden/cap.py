@@ -35,7 +35,9 @@ __all__ = ["S3CAPModel",
            "cap_template_rheader",
            "cap_template_controller",
            "cap_info_rheader",
-           "cap_info_controller"
+           "cap_info_controller",
+           "cap_profile_rheader",
+           "cap_profile_controller"
            ]
 
 import time
@@ -57,7 +59,8 @@ class S3CAPModel(S3Model):
              "cap_info_resource",
              "cap_info_area",
              "cap_info",
-             "cap_alert"
+             "cap_alert",
+             "cap_profile"
              ]
 
     def model(self):
@@ -339,7 +342,6 @@ class S3CAPModel(S3Model):
         # CAP Informations as component of Alerts
         add_component("cap_info", cap_alert="alert_id")
 
-        # @ToDo: Move these to the controller in a prep if r.interactive
         table.identifier.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
@@ -849,6 +851,105 @@ class S3CAPModel(S3Model):
                   T("The maximum altitude of the affected area"),
                   T("must not be used except in combination with the 'altitude' element. The ceiling measure is in feet above mean sea level.")))
 
+        # @ToDo: i18n: Need label=T("")
+        tablename = "cap_profile"
+        table = define_table(tablename,
+                             Field("title", label = T("Title")),
+                             Field("identifier_prefix", label=T("Identifier prefix")),
+                             Field("identifier_suffix", label=T("Identifier suffix")),
+                             Field("sender_prefix", label=T("Sender prefix")),
+                             Field("sender_suffix", label=T("Sender suffix")),
+                             Field("allowed_statuses", label=T("Allowed statuses"),
+                                   requires=IS_IN_SET(cap_alert_status_code_opts, multiple=True)),
+                             Field("single_status", "boolean", label=T("Single status")),
+                             Field("allowed_scopes", label=T("Allowed scopes"),
+                                   requires=IS_IN_SET(cap_alert_scope_code_opts, multiple=True)),
+                             Field("restriction", "text", label=T("Restriction")), # text decribing the restriction for scope=restricted
+                             Field("addresses", "list:string",
+                                   label = T("Recipients"),
+                                   represent=self.list_string_represent),
+                             Field("codes", "list:string",
+                                   label=T("Codes"),
+                                   widget = S3KeyValueWidget(),
+                                   represent = lambda v: \
+                                    self.list_string_represent(v, lambda i: \
+                                            ": ".join(i.split("`", 1))),
+                                   ),
+                             Field("allowed_incidents", label=T("Allowed incidents"),
+                                   requires=IS_IN_SET(cap_incident_type_opts,
+                                                      multiple=True),
+                                   represent = self.list_string_represent),
+                             Field("single_event", "boolean", label=T("Limit one subject event per alert")),
+                             Field("require_area", "boolean", label=T("Require an <area>")),
+                             *s3_meta_fields())
+        table.title.comment = DIV(
+              _class="tooltip",
+              _title="%s|%s" % (
+                  T("Title"),
+                  T("a descriptive name for the profile")))
+        table.identifier_prefix.comment = DIV(
+              _class="tooltip",
+              _title="%s|%s" % (
+                  T("Identifier prefix"),
+                  T("prefix for identifier values.")))
+        table.identifier_suffix.comment = DIV(
+              _class="tooltip",
+              _title="%s|%s" % (
+                  T("Identifier suffix"),
+                  T("Suffix for identifier")))
+        table.sender_prefix.comment = DIV(
+              _class="tooltip",
+              _title="%s|%s" % (
+                  T("Sender prefix"),
+                  T("prefix for sender using this profile")))
+        table.sender_suffix.comment = DIV(
+              _class="tooltip",
+              _title="%s|%s" % (
+                  T("The maximum altitude of the affected area"),
+                  T("suffix for sender using this profile")))
+        table.allowed_statuses.comment = DIV(
+              _class="tooltip",
+              _title="%s|%s" % (
+                  T("Allowed statuses"),
+                  T("select status values allowed by the profile")))
+        table.single_status.comment = DIV(
+              _class="tooltip",
+              _title="%s|%s" % (
+                  T("Single status"),
+                  T("Disallow selection of multiple status values")))
+        table.allowed_scopes.comment = DIV(
+              _class="tooltip",
+              _title="%s|%s" % (
+                  T("Scope values"),
+                  T("Which scope values are allowed?")))
+        table.single_event.comment = DIV(
+              _class="tooltip",
+              _title="%s|%s" % (
+                  T("Single event"),
+                  T("Disallow multiple subject events")))
+        table.require_area.comment = DIV(
+              _class="tooltip",
+              _title="%s|%s" % (
+                  T("Require area"),
+                  T("Require that each info under this profile has an area associated with it!")))
+
+        ADD_PROFILE = T("Create profile")
+        crud_strings[tablename] = Storage(
+            title_create = ADD_PROFILE,
+            title_display = T("Profile"),
+            title_list = T("Profiles"),
+            title_update = T("Edit profile"), # If already-published, this should create a new "Update" alert instead of modifying the original
+            title_upload = T("Import profiles"),
+            title_search = T("Search profiles"),
+            subtitle_create = T("Create new profile"),
+            label_list_button = T("List profiles"),
+            label_create_button = ADD_PROFILE,
+            label_delete_button = T("Delete profile"),
+            msg_record_created = T("Profile created"),
+            msg_record_modified = T("Profile modified"),
+            msg_record_deleted = T("Profile deleted"),
+            msg_list_empty = T("No profiles to show"))
+
         # ---------------------------------------------------------------------
         # Pass variables back to global scope (s3db.*)
         return Storage()
@@ -1096,6 +1197,12 @@ def cap_template_rheader(r):
                          )
             return rheader
     return None
+
+# =============================================================================
+def cap_profile_rheader(r):
+    """ Resource Header for Info segments """
+    return None
+
 # =============================================================================
 def cap_info_rheader(r):
     """ Resource Header for Info segments """
@@ -1279,6 +1386,16 @@ def cap_info_controller():
     if "form" in output:
         add_submit_button(output["form"], "add_language",
                           current.T("Save and add another language..."))
+
+    return output
+
+# =============================================================================
+def cap_profile_controller():
+    """ RESTful CRUD controller """
+
+    s3db = current.s3db
+    output = current.rest_controller("cap", "profile",
+                                     rheader=s3db.cap_profile_rheader)
 
     return output
 
