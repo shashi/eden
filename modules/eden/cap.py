@@ -854,7 +854,7 @@ class S3CAPModel(S3Model):
         # @ToDo: i18n: Need label=T("")
         tablename = "cap_profile"
         table = define_table(tablename,
-                             Field("title", label = T("Title")),
+                             Field("title", label = T("Title"), required=True),
                              Field("identifier_prefix", label=T("Identifier prefix")),
                              Field("identifier_suffix", label=T("Identifier suffix")),
                              Field("sender_prefix", label=T("Sender prefix")),
