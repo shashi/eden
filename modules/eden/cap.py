@@ -295,9 +295,8 @@ class S3CAPModel(S3Model):
                                    represent=self.list_string_represent),
                              Field("codes", "list:string",
                                    widget = S3KeyValueWidget(),
-                                   represent = lambda v: \
-                                    self.list_string_represent(v, lambda i: \
-                                            ": ".join(i.split("`", 1))),
+                                   represent = S3KeyValueWidget.represent,
+                                   default = [{"key": "A", "value": 65, "comment": "ASCII Values", "options": [[65, "sixty-five"], [97, "ninety-five"], ["one-o-3", 103]], "immutable": 1}]
                                    ),
                              Field("note", "text"),
                              Field("reference", "list:reference cap_alert",
@@ -511,9 +510,7 @@ class S3CAPModel(S3Model):
                              Field("audience", "text"),
                              Field("event_code", "list:string",
                                    widget = S3KeyValueWidget(),
-                                   represent = lambda v: \
-                                    self.list_string_represent(v, lambda i: \
-                                        ": ".join(i.split("`", 1)))
+                                   represent = S3KeyValueWidget.represent
                                    ),
                              Field("effective", "datetime",
                                    # @ToDo: format/represent for l10n options
@@ -532,9 +529,7 @@ class S3CAPModel(S3Model):
                              Field("parameter", "list:string",
                                    label = T("Parameters"),
                                    widget = S3KeyValueWidget(),
-                                   represent = lambda v: \
-                                    self.list_string_represent(v, lambda i: \
-                                        ": ".join(i.split("`", 1)))),
+                                   represent = S3KeyValueWidget.represent),
                              *s3_meta_fields())
 
         info_labels = cap_info_labels()

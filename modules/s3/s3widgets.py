@@ -3688,75 +3688,57 @@ class S3KeyValueWidget(ListWidget):
         Allows for input of key-value pairs and stores them as list:string
     """
 
-    def __init__(self, key_label=None, value_label=None, delimiter="`"):
+    def __init__(self, key_label=None, value_label=None):
         """
             Returns a widget with key-value fields
         """
         self._class = "key-value-pairs"
-        self.delimiter = delimiter
         T = current.T
 
-        if key_label == None:
-            self.key_label = "%s: " % T("Key")
-        else:
-            self.key_label = key_label
-
-        if value_label == None:
-            self.value_label = "%s: " % T("Value")
-        else:
-            self.value_label = value_label
+        self.key_label = key_label or T("Key")
+        self.value_label = value_label or T("Value")
 
     def __call__(self, field, value, **attributes):
         T = current.T
+        s3 = current.response.s3
+
         _id = "%s_%s" % (field._tablename, field.name)
         _name = field.name
-        _class = "string"
-        requires = field.requires if isinstance(field.requires, (IS_NOT_EMPTY, IS_LIST_OF)) else None
-        items = []
+        _class = "text hide"
 
-        for val in value or [""]:
-            kv = val.split(self.delimiter)
-            k = kv[0]
-            if len(kv)>1: v = kv[1]
-            else: v = ""
-
-            items.append(LI(
-                INPUT(_id=_id, _class=_class, _name=_name, _type="hidden", value=val, hideerror=True, requires=requires),
-                self.key_label,
-                INPUT(_class="key", _type="text", _value=k), " ",
-                self.value_label,
-                INPUT(_class="value", _type="text", _value=v)
-            ))
+        attributes["_id"] = _id
 
         script = SCRIPT(
-'''(function($){
-$.fn.kv_pairs = function (keyl, vall, delim) {
- var self=$(this),
-     ref=self.find(':hidden:first').clone(),
-     plus=$('<a href="javascript:void(0)">+</a>').click(function(){new_item()})
- function new_item(){
-  self.find('li').each(function(){
-   var trimmed=$.trim($(this).find(":hidden").val())
-   if(trimmed==''||trimmed==delim) $(this).remove()
-  })
-  self.append($("<li>").append(ref.clone().val(''))
-   .append(keyl+' <input class="key" type="text"> '+vall+' <input class="value" type="text">')
-   .append(plus)).find('.key:last').focus()
-  return false
- }
- self.find('.value,.key').live('keypress',function(e){
-  return (e.which == 13)?$(this).is(".value")&&new_item():true
- }).live('blur',function(){
-  var li=$(this).parents().eq(0)
-  li.find(':hidden').val(li.find('.key').val()+delim+li.find('.value').val())
- })
- self.find('.value:last').after(plus)
-}
-})(jQuery)
-jQuery(document).ready(function(){jQuery('#%s_kv_pairs').kv_pairs('%s','%s','%s')})''' % \
-    (_id, self.key_label, self.value_label, self.delimiter))
-        attributes["_id"] = _id + "_kv_pairs"
+'''jQuery(document).ready(function(){jQuery('#%s').kv_pairs('%s','%s')})''' % \
+    (_id, self.key_label, self.value_label))
 
-        return TAG[""](UL(*items, **attributes), script)
+        if not value: value = "[]"
+        if not isinstance(value, str):
+            try:
+                value = json.dumps(value)
+            except:
+                raise("Bad value for key-value pair field")
+        appname = current.request.application
+        jsfile = "/%s/static/scripts/S3/%s" % (appname, "s3.keyvalue.widget.js")
 
+        if jsfile not in s3.scripts:
+            s3.scripts.append(jsfile)
+
+        return TAG[""](
+                    TEXTAREA(value, **attributes),
+                    script
+               )
+
+    @staticmethod
+    def represent(value):
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except:
+                # FIXME: Log this.
+                return ""
+        rep = []
+        for kv in value:
+            rep += ["%s: %s" % (kv["key"], kv["value"])]
+        return ", ".join(rep)
 # END =========================================================================
