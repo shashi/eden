@@ -32,6 +32,7 @@ __all__ = ["S3CAPModel",
            "cap_alert_is_template",
            "cap_alert_rheader",
            "cap_alert_controller",
+           "cap_first_run",
            "cap_template_rheader",
            "cap_template_controller",
            "cap_info_rheader",
@@ -1276,5 +1277,18 @@ def cap_info_controller():
                           current.T("Save and add another language..."))
 
     return output
+
+def cap_first_run():
+    """ Add the default template """
+
+    db = current.db
+    s3db = current.s3db
+    atable = s3db.cap_alert
+
+    s3db.configure("cap_alert")
+    if not db(atable.id > 0).select(atable.id,
+                                    limitby=(0, 1)):
+        # @fixme: get this to work!
+        s3db.cap_alert.insert(template_title="Default", is_template='T')
 
 # END =========================================================================
