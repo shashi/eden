@@ -86,12 +86,12 @@
                 values = {};
                 settings = {};
             } else if (tablename == 'cap_alert') {
-                values = data['$_cap_alert'][0];
+                values = (data['$_cap_alert'] && data['$_cap_alert'][0]) || {};
                 settings = $.parseJSON(values.template_settings) || {};
                 $('.cap_alert_form').addClass('template_loaded');
             } else if (tablename == 'cap_info') {
                 // FIXME: Multiple info :/
-                values = data['$_cap_info'][0];
+                values = (data['$_cap_info'] && data['$_cap_info'][0]) || {};
                 settings = $.parseJSON(values.template_settings) || {};
             }
 

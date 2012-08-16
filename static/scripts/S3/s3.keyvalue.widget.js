@@ -42,14 +42,14 @@
         }
 
         for (var i=0, len=kvs.length; i < len; i++) {
+            if (!kvs[i]) continue;
+
             var item = kvs[i],
                 ops = item && item.options,
-                immutable = Number(item && item.immutable),
+                immutable = Number(item.immutable),
                 $item = $('<li></li>').attr("id", id + "-" + i),
-                $key = $('<input class="key" value="' + (item && item.key || "") + '" />'),
-                $value = $('<input class="value" value="' + (item && item.value || "") + '" />');
-
-            if (!item) continue;
+                $key = $('<input class="key" value="' + (item.key || "") + '" />'),
+                $value = $('<input class="value" value="' + (item.value || "") + '" />');
 
             if (immutable) {
                 if (immutable & 1) {
