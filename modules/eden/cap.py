@@ -299,7 +299,7 @@ class S3CAPModel(S3Model):
                                    #       this should eventually use the CAP contacts
                                    #widget = S3CAPAddressesWidget,
                                    represent=self.list_string_represent),
-                             Field("codes",
+                             Field("codes", "text",
                                    widget = S3KeyValueWidget(),
                                    represent = S3KeyValueWidget.represent,
                                    default = settings.get_cap_codes()
@@ -543,7 +543,7 @@ class S3CAPModel(S3Model):
                              Field("certainty", required=True,
                                    requires=IS_IN_SET(cap_info_certainty_opts)),
                              Field("audience", "text"),
-                             Field("event_code",
+                             Field("event_code", "text",
                                    widget = S3KeyValueWidget(),
                                    represent = S3KeyValueWidget.represent,
                                    default = settings.get_cap_event_codes()
@@ -562,7 +562,7 @@ class S3CAPModel(S3Model):
                              Field("contact", "text"),
                              Field("web",
                                    requires=IS_NULL_OR(IS_URL())),
-                             Field("parameter",
+                             Field("parameter", "text",
                                    label = T("Parameters"),
                                    widget = S3KeyValueWidget(),
                                    represent = S3KeyValueWidget.represent,
@@ -823,7 +823,9 @@ class S3CAPModel(S3Model):
                                   location_id(),
                                   Field("circle"),
                                   Field("geocode", "text",
-                                        widget = S3KeyValueWidget()),
+                                        widget = S3KeyValueWidget(),
+                                        represent = S3KeyValueWidget.represent,
+                                        default = settings.get_cap_geocodes),
                                   Field("altitude", "integer"),
                                   Field("ceiling", "integer"),
                                   *s3_meta_fields())

@@ -669,6 +669,18 @@ class S3Config(Storage):
         """
         return self.cap.get("parameters", {})
 
+    def get_cap_geocodes(self):
+        """
+            default geocodes.
+
+            should return a list of dicts:
+            [ {"key": "<ValueName>, "value": "<Value>",
+               "comment": "<Help string>", "mutable": True|False},
+              ...]
+
+        """
+        return self.cap.get("geocodes", {})
+
     def get_cap_base64(self):
         """
             Should cap resources be base64 encoded and embedded in the alert message?
