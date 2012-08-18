@@ -1124,7 +1124,7 @@ class S3OptionsMenu(object):
                     M("Alerts", f="alert", vars={'alert.is_template': 'F'})(
                         M("List alerts", f="alert", vars={'alert.is_template': 'F'}),
                         M("Create alert", f="alert", m="create"),
-                        M("Search", m="search"),
+                        M("Search & Subscribe", m="search"),
                     ),
                     M("Templates", f="template", vars={'alert.is_template': 'T'})(
                         M("List templates", f="template", vars={'alert.is_template': 'T'}),

@@ -72,6 +72,40 @@
             }
         });
 
+        $form.find('[name=priority]').change(function() {
+            var p = S3.cap_priorities,
+                len = p.length;
+            if ($(this).val() == "Unknown")
+                    $(this).css('border', "2px solid gray");
+            for (var i=0; i< len; i++) {
+                if (p[i][0] == $(this).val()) {
+                    $form.find('[name=urgency]').val(p[i][1]);
+                    $form.find('[name=severity]').val(p[i][2]);
+                    $form.find('[name=certainty]').val(p[i][3]);
+
+                    $(this).css('border', "2px solid " + p[i][4]);
+                }
+            }
+        });
+
+        $form.find('[name=urgency],[name=severity],[name=certainty]').change(function() {
+            var p = S3.cap_priorities,
+                len = p.length;
+            for (var i=0; i< len; i++) {
+                if ($form.find('[name=urgency]').val()   == p[i][1] &&
+                    $form.find('[name=severity]').val()  == p[i][2] &&
+                    $form.find('[name=certainty]').val() == p[i][3]) {
+
+                    $form.find('[name=priority]').val(p[i][0])
+                        .css('border', "2px solid " + p[i][4]);
+                    return;
+                }
+            }
+
+            $form.find('[name=priority]').val("Unknown")
+                        .css('border', "2px solid gray");
+        });
+
         function load_template_data(data, overwrite) {
             var tablename = get_table($form),
                 fields = get_template_fields(tablename),
@@ -90,7 +124,6 @@
                 settings = $.parseJSON(values.template_settings) || {};
                 $('.cap_alert_form').addClass('template_loaded');
             } else if (tablename == 'cap_info') {
-                // FIXME: Multiple info :/
                 values = (data['$_cap_info'] && data['$_cap_info'][0]) || {};
                 settings = $.parseJSON(values.template_settings) || {};
             }
@@ -132,10 +165,8 @@
 
         function apply_alert_template(id, overwrite, type) {
             console.log("Applying template " + id);
-            if (id == '' || !id) {
-                load_template_data({}, overwrite);
-                return;
-            }
+            if (!id) return;
+
             if (typeof(type) == 'undefined') {
                 type = "template";
             }

@@ -64,6 +64,7 @@ __all__ = ["S3SearchWidget",
            "S3PersonSearch",
            "S3HRSearch",
            "S3PentitySearch",
+           "S3CAPSearch",
            ]
 
 MAX_RESULTS = 1000
@@ -2629,6 +2630,13 @@ class S3PentitySearch(S3Search):
         return output
 
 # =============================================================================
+class S3CAPSearch(S3Search):
+    """
+        Search method with specifics for Alerts
+    """
+    pass
+
+# =============================================================================
 class S3SearchOrgHierarchyWidget(S3SearchOptionsWidget):
 
     def widget(self, resource, vars):
@@ -2643,105 +2651,5 @@ class S3SearchOrgHierarchyWidget(S3SearchOptionsWidget):
             field_type = str(field.type)
 
         return S3OrganisationHierarchyWidget()(field, {}, **self.attr)
-
-# =============================================================================
-class S3CAPSearch(S3Search):
-    """
-        Search method with specifics for Alerts
-    """
-
-    def search_json(self, r, **attr):
-        """
-            JSON search method for S3OrganisationAutocompleteWidget
-
-            @param r: the S3Request
-            @param attr: request attributes
-        """
-
-        response = current.response
-        resource = self.resource
-        table = self.table
-
-        # Query comes in pre-filtered to accessible & deletion_status
-        # Respect response.s3.filter
-        resource.add_filter(response.s3.filter)
-
-        _vars = self.request.vars # should be request.get_vars?
-
-        # JQueryUI Autocomplete uses "term"
-        # old JQuery Autocomplete uses "q"
-        # what uses "value"?
-        value = _vars.term or _vars.value or _vars.q or None
-
-        # We want to do case-insensitive searches
-        # (default anyway on MySQL/SQLite, but not PostgreSQL)
-        value = value.lower().strip()
-
-        filter = _vars.filter
-
-        if filter and value:
-
-            if filter == "~":
-                query = (S3FieldSelector("parent.name").lower().like(value + "%")) | \
-                        (S3FieldSelector("parent.acronym").lower().like(value + "%")) | \
-                        (S3FieldSelector("organisation.name").lower().like(value + "%")) | \
-                        (S3FieldSelector("organisation.acronym").lower().like(value + "%"))
-
-            else:
-                output = current.xml.json_message(
-                                False,
-                                400,
-                                "Unsupported filter! Supported filters: ~"
-                            )
-                raise HTTP(400, body=output)
-
-        resource.add_filter(query)
-
-        limit = int(_vars.limit or 0)
-        if (not limit or limit > MAX_SEARCH_RESULTS) and resource.count() > MAX_SEARCH_RESULTS:
-            output = jsons([dict(id="",
-                                 name="Search results are over %d. Please input more characters." \
-                                 % MAX_SEARCH_RESULTS)])
-        else:
-            btable = current.s3db.org_organisation_branch
-            field = table.name
-            field2 = table.acronym
-            field3 = btable.organisation_id
-
-            # Fields to return
-            fields = [table.id, field, field2, field3]
-
-            attributes = dict(orderby=field)
-            limitby = resource.limitby(start=0, limit=limit)
-            if limitby is not None:
-                attributes["limitby"] = limitby
-            rows = resource.select(*fields, **attributes)
-            output = []
-            append = output.append
-            db = current.db
-            for row in rows:
-                name = row[table].name
-                parent = None
-                if "org_organisation_branch" in row:
-                    query = (table.id == row[btable].organisation_id)
-                    parent = db(query).select(table.name,
-                                              limitby = (0, 1)).first()
-                    if parent:
-                        name = "%s > %s" % (parent.name,
-                                            name)
-                if not parent:
-                    acronym = row[table].acronym
-                    if acronym:
-                        name = "%s (%s)" % (name,
-                                            acronym)
-                record = dict(
-                    id = row[table].id,
-                    name = name,
-                    )
-                append(record)
-            output = jsons(output)
-
-        response.headers["Content-Type"] = "application/json"
-        return output
 
 # END =========================================================================

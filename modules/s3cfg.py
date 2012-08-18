@@ -703,12 +703,13 @@ class S3Config(Storage):
             OrderedDict([
                             ("<value>, ("<Descriptive title>", (<urgency>, <severity>, <certainty>))),
                              ...
-                        ])
-        """
+                        ]) """
         T = current.T
-        return self.cap.get("priorities", OrderedDict([
-                                            ("Urgent", (T("Urgent -- very."), ("urgent", "severe", "certain")))
-                                          ]))
+        return self.cap.get("priorities", [
+                                            ("Urgent", T("Urgent"), "Immediate", "Extreme", "Observed", "red"),
+                                            ("High", T("High"), "Expected", "Severe", "Observed", "orange"),
+                                            ("Low", T("Low"), "Expected", "Moderate", "Observed", "green")
+                                          ])
 
     # -------------------------------------------------------------------------
     # Human Resource Management

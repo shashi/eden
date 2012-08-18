@@ -39,6 +39,14 @@ __all__ = ["S3CAPModel",
            "cap_info_controller"
            ]
 
+try:
+    import json # try stdlib (Python 2.6)
+except ImportError:
+    try:
+        import simplejson as json # try external module
+    except:
+        import gluon.contrib.simplejson as json # fallback to pure-Python module
+
 import time
 
 from gluon import *
@@ -229,27 +237,27 @@ class S3CAPModel(S3Model):
         #
 
         # CAP alert Status Code (status)
-        cap_alert_status_code_opts = {
-            "Actual":T("Actual - actionable by all targeted recipients"),
-            "Exercise":T("Exercise - only for designated participants (decribed in note)"),
-            "System":T("System - for internal functions"),
-            "Test":T("Test - testing, all recipients disregard"),
-            "Draft":T("Draft - not actionable in its current form"),
-        }
+        cap_alert_status_code_opts = OrderedDict([
+            ("Actual", T("Actual - actionable by all targeted recipients")),
+            ("Exercise", T("Exercise - only for designated participants (decribed in note)")),
+            ("System", T("System - for internal functions")),
+            ("Test", T("Test - testing, all recipients disregard")),
+            ("Draft", T("Draft - not actionable in its current form")),
+        ])
         # CAP alert message type (msgType)
-        cap_alert_msgType_code_opts = {
-            "Alert":T("Alert: Initial information requiring attention by targeted recipients"),
-            "Update":T("Update: Update and supercede earlier message(s)"),
-            "Cancel":T("Cancel: Cancel earlier message(s)"),
-            "Ack":T("Ack: Acknowledge receipt and acceptance of the message(s)"),
-            "Error":T("Error: Indicate rejection of the message(s)"),
-        }
+        cap_alert_msgType_code_opts = OrderedDict([
+            ("Alert", T("Alert: Initial information requiring attention by targeted recipients")),
+            ("Update", T("Update: Update and supercede earlier message(s)")),
+            ("Cancel", T("Cancel: Cancel earlier message(s)")),
+            ("Ack", T("Ack: Acknowledge receipt and acceptance of the message(s)")),
+            ("Error", T("Error: Indicate rejection of the message(s)")),
+        ])
         # CAP alert scope
-        cap_alert_scope_code_opts = {
-            "Public": "Public - unrestricted audiences",
-            "Restricted": "Restricted - to users with a known operational requirement (described in restriction)",
-            "Private": "Private - only to specified addresses (mentioned as recipients)"
-        }
+        cap_alert_scope_code_opts = OrderedDict([
+            ("Public", T("Public - unrestricted audiences")),
+            ("Restricted", T("Restricted - to users with a known operational requirement (described in restriction)")),
+            ("Private", T("Private - only to specified addresses (mentioned as recipients)"))
+        ])
 
         # @ToDo: i18n: Need label=T("")
         tablename = "cap_alert"
@@ -268,7 +276,7 @@ class S3CAPModel(S3Model):
                                       comment = T("Apply a template"),
                                       ondelete = "RESTRICT"),
                              Field("template_title"),
-                             Field("template_settings", "text", readable=False),
+                             Field("template_settings", "text", readable=False, default="{}"),
                              Field("identifier", unique=True,
                                    default = self.generate_identifier),
                              Field("sender",
@@ -306,6 +314,25 @@ class S3CAPModel(S3Model):
                                                       multiple=True),
                                    represent = self.list_string_represent),
                              *s3_meta_fields())
+
+        # -----------------------------------------------------------------------------
+        cap_search = S3CAPSearch(
+                 simple = (S3SearchSimpleWidget(
+                     name="org_search_text_simple",
+                     label = T("Search"),
+                     comment = T("Search for an Organization by name or acronym."),
+                     field = [ "sender",
+                               "incidents",
+                               "cap_info$headline",
+                               "cap_info$event"
+                             ]
+                     )
+                 ),
+            )
+
+        utablename = current.auth.settings.table_user_name
+        self.configure(tablename,
+                  search_method=cap_search)
 
         if crud_strings["cap_template"]:
             crud_strings[tablename] = crud_strings["cap_template"]
@@ -416,61 +443,62 @@ class S3CAPModel(S3Model):
         #
 
         # CAP info Event Category (category)
-        cap_info_category_opts = {
-            "Geo":T("Geophysical (inc. landslide)"),
-            "Met":T("Meteorological (inc. flood)"),
-            "Safety":T("General emergency and public safety"),
-            "Security":T("Law enforcement, military, homeland and local/private security"),
-            "Rescue":T("Rescue and recovery"),
-            "Fire":T("Fire suppression and rescue"),
-            "Health":T("Medical and public health"),
-            "Env":T("Pollution and other environmental"),
-            "Transport":T("Public and private transportation"),
-            "Infra":T("Utility, telecommunication, other non-transport infrastructure"),
-            "CBRNE":T("Chemical, Biological, Radiological, Nuclear or High-Yield Explosive threat or attack"),
-            "Other":T("Other events"),
-        }
+        cap_info_category_opts = OrderedDict([
+            ("Geo", T("Geophysical (inc. landslide)")),
+            ("Met", T("Meteorological (inc. flood)")),
+            ("Safety", T("General emergency and public safety")),
+            ("Security", T("Law enforcement, military, homeland and local/private security")),
+            ("Rescue", T("Rescue and recovery")),
+            ("Fire", T("Fire suppression and rescue")),
+            ("Health", T("Medical and public health")),
+            ("Env", T("Pollution and other environmental")),
+            ("Transport", T("Public and private transportation")),
+            ("Infra", T("Utility, telecommunication, other non-transport infrastructure")),
+            ("CBRNE", T("Chemical, Biological, Radiological, Nuclear or High-Yield Explosive threat or attack")),
+            ("Other", T("Other events")),
+        ])
         # CAP info Response Type (responseType)
-        cap_info_responseType_opts = {
-            "Shelter":T("Shelter - Take shelter in place or per instruction"),
-            "Evacuate":T("Evacuate - Relocate as instructed in the instruction"),
-            "Prepare":T("Prepare - Make preparations per the instruction"),
-            "Execute":T("Execute - Execute a pre-planned activity identified in instruction"),
-            "Avoid":T("Avoid - Avoid the subject event as per the instruction"),
-            "Monitor":T("Monitor - Attend to information sources as described in instruction"),
-            "Assess":T("Assess - Evaluate the information in this message."),
-            "AllClear":T("AllClear - The subject event no longer poses a threat"),
-            "None":T("None - No action recommended"),
-        }
+        cap_info_responseType_opts = OrderedDict([
+            ("Shelter", T("Shelter - Take shelter in place or per instruction")),
+            ("Evacuate", T("Evacuate - Relocate as instructed in the instruction")),
+            ("Prepare", T("Prepare - Make preparations per the instruction")),
+            ("Execute", T("Execute - Execute a pre-planned activity identified in instruction")),
+            ("Avoid", T("Avoid - Avoid the subject event as per the instruction")),
+            ("Monitor", T("Monitor - Attend to information sources as described in instruction")),
+            ("Assess", T("Assess - Evaluate the information in this message.")),
+            ("AllClear", T("AllClear - The subject event no longer poses a threat")),
+            ("None", T("None - No action recommended")),
+        ])
         # CAP info urgency
-        cap_info_urgency_opts = {
-            "Immediate":T("Respone action should be taken immediately"),
-            "Expected":T("Response action should be taken soon (within next hour)"),
-            "Future":T("Responsive action should be taken in the near future"),
-            "Past":T("Responsive action is no longer required"),
-            "Unknown":T("Unknown"),
-        }
+        cap_info_urgency_opts = OrderedDict([
+            ("Immediate", T("Respone action should be taken immediately")),
+            ("Expected", T("Response action should be taken soon (within next hour)")),
+            ("Future", T("Responsive action should be taken in the near future")),
+            ("Past", T("Responsive action is no longer required")),
+            ("Unknown", T("Unknown")),
+        ])
         # CAP info severity
-        cap_info_severity_opts = {
-            "Extreme":T("Extraordinary threat to life or property"),
-            "Severe":T("Significant threat to life or property"),
-            "Moderate":T("Possible threat to life or property"),
-            "Minor":T("Minimal to no known threat to life or property"),
-            "Unknown":T("Severity unknown"),
-        }
+        cap_info_severity_opts = OrderedDict([
+            ("Extreme", T("Extraordinary threat to life or property")),
+            ("Severe", T("Significant threat to life or property")),
+            ("Moderate", T("Possible threat to life or property")),
+            ("Minor", T("Minimal to no known threat to life or property")),
+            ("Unknown", T("Severity unknown")),
+        ])
         # CAP info certainty
-        cap_info_certainty_opts = {
-            "Observed":T("Observed: determined to have occurred or to be ongoing"),
-            "Likely":T("Likely (p > ~50%)"),
-            "Possible":T("Possible but not likely (p <= ~50%)"),
-            "Unlikely":T("Not expected to occur (p ~ 0)"),
-            "Unknown":T("Certainty unknown"),
-        }
+        cap_info_certainty_opts = OrderedDict([
+            ("Observed", T("Observed: determined to have occurred or to be ongoing")),
+            ("Likely", T("Likely (p > ~50%)")),
+            ("Possible", T("Possible but not likely (p <= ~50%)")),
+            ("Unlikely", T("Not expected to occur (p ~ 0)")),
+            ("Unknown", T("Certainty unknown")),
+        ])
 
         # CAP info priority
         priorities = settings.get_cap_priorities()
         try:
-            cap_info_priority_opts = [(priorities[f][0], priorities[f][1][0]) for f in priorities]
+            cap_info_priority_opts = OrderedDict([(f[0], f[1]) for f in priorities]
+                    + [("Unknown", T("Unknown"))])
         except IndexError:
             raise ValueError("cap priorities setting is not structured properly")
 
@@ -506,7 +534,8 @@ class S3CAPModel(S3Model):
                                    requires=IS_IN_SET(cap_info_responseType_opts,
                                                       multiple=True),
                                    represent=self.list_string_represent), # 0 or more allowed
-                             Field("priority"),
+                             Field("priority",
+                                    requires=IS_IN_SET(cap_info_priority_opts)),
                              Field("urgency", required=True,
                                    requires=IS_IN_SET(cap_info_urgency_opts)),
                              Field("severity", required=True,
@@ -730,16 +759,14 @@ class S3CAPModel(S3Model):
         table = define_table(tablename,
                              info_id(),
                              Field("resource_desc", required=True),
-                             Field("mime_type", notnull=True),
+                             Field("mime_type", required=True),
                              Field("size", "integer",
                                    writable = False),
                              Field("uri",
                                    writable = False), # needs a special validation
                              Field("file", "upload"),
-                             # XXX: Should this be made per-info instead of per-file?
-                             Field("base64encode", "boolean",
-                                   label = T("Encode in message?")),
-                             #Field("deref_uri", "text"), <-- base 64 encoded
+                             Field("deref_uri", "text",
+                                    writable=False, readable=False),
                              Field("digest",
                                    writable=False),
                              *s3_meta_fields())
@@ -775,15 +802,6 @@ class S3CAPModel(S3Model):
                   T("The identifier of the hyperlink for the resource file"),
                   T("A full absolute URI, typically a Uniform Resource Locator that can be used to retrieve the resource over the Internet.")))
 
-
-        #table.deref_uri.writable = False
-        #table.deref_uri.readable = False
-
-        table.base64encode.comment = DIV(
-              _class="tooltip",
-              _title="%s|%s" % (
-                  T("Should this file be encoded into the CAP Message and sent?"),
-                  T("Selecting this will encode the file in Base 64 encoding (which converts it into text) and sends it embedded in the CAP message. This is useful in one-way network where the sender cannot create URLs publicly accessible over the internet.")))
 
         table.digest.comment = DIV(
               _class="tooltip",
@@ -1200,16 +1218,15 @@ def cap_alert_controller():
     if "form" in output:
         form = output["form"]
 
-        if "table" in form:
+        if form and "table" in dir(form):
             tablename = form.table._tablename
+
+            if tablename == 'cap_alert':
+                alert_form_mods(form)
+                form.update(_class="cap_alert_form")
+            set_priority_js()
         else:
             return output
-
-        T = current.T
-
-        if tablename == 'cap_alert':
-            alert_form_mods(form)
-            form.update(_class="cap_alert_form")
 
         #if tablename == 'cap_info':
         #    add_submit_button(form, "add_language", T("Save and add another language"))
@@ -1287,6 +1304,7 @@ def cap_info_controller():
 
 
     if "form" in output:
+        set_priority_js()
         add_submit_button(output["form"], "add_language",
                           current.T("Save and add another language..."))
 
@@ -1304,5 +1322,17 @@ def cap_first_run():
                                     limitby=(0, 1)):
         # @fixme: get this to work!
         s3db.cap_alert.insert(template_title="Default", is_template='T')
+
+def set_priority_js():
+    """ Output json for priority field """
+
+    settings = current.deployment_settings
+    js_global = current.response.s3.js_global
+
+    p_settings = [f[0:1] + f[2:] for f in settings.get_cap_priorities()]
+
+    priority_conf = "S3.cap_priorities = %s;" % json.dumps(p_settings)
+    if not priority_conf in js_global:
+        js_global.append(priority_conf)
 
 # END =========================================================================

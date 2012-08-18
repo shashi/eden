@@ -10,7 +10,13 @@ resourcename = request.function
 if module not in settings.modules:
     raise HTTP(404, body="Module disabled: %s" % module)
 
-import json
+try:
+    import json # try stdlib (Python 2.6)
+except ImportError:
+    try:
+        import simplejson as json # try external module
+    except:
+        import gluon.contrib.simplejson as json # fallback to pure-Python module
 
 # -----------------------------------------------------------------------------
 def index():
@@ -117,7 +123,10 @@ def alert():
                 if tid:
                     # read template and copy locked fields to post_vars
                     template = s3db.cap_alert(s3db.cap_alert.id == tid)
-                    settings = json.loads(template.template_settings)
+                    try:
+                        settings = json.loads(template.template_settings)
+                    except ValueError:
+                        settings = dict()
                     if isinstance(settings.get('locked', False), dict):
                         locked_fields = [lf for lf in settings["locked"] if settings["locked"]]
                         for lf in locked_fields:
