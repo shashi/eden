@@ -34,13 +34,13 @@ def info_prep(r):
         item = r.record
         if (item and r.resource.tablename == "cap_info" and s3db.cap_alert_is_template(item.alert_id)):
             for f in ["urgency", "certainty",
-                      "effective", "onset", "expires"]:
+                      "effective", "onset", "expires",
+                      "priority", "severity"]:
                 s3db.cap_info[f].writable = False
                 s3db.cap_info[f].readable = False
                 s3db.cap_info[f].required = False
             for f in ["category", "event"]:
                 s3db.cap_info[f].required = False
-
 
     if request.post_vars.get("language", False):
         if (r.tablename == "cap_info"):

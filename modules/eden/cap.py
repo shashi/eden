@@ -498,7 +498,7 @@ class S3CAPModel(S3Model):
         priorities = settings.get_cap_priorities()
         try:
             cap_info_priority_opts = OrderedDict([(f[0], f[1]) for f in priorities]
-                    + [("Unknown", T("Unknown"))])
+                    + [("Undefined", T("Undefined"))])
         except IndexError:
             raise ValueError("cap priorities setting is not structured properly")
 
@@ -1268,7 +1268,10 @@ def cap_template_controller():
     for f in ["status", "scope"]:
         s3db.cap_alert[f].requires = None
 
+    s3db.cap_alert.template_title.required = True
+
     for f in ["urgency", "certainty",
+              "priority", "severity",
               "effective", "onset", "expires"]:
         s3db.cap_info[f].writable = False
         s3db.cap_info[f].readable = False

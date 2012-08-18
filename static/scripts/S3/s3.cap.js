@@ -75,8 +75,14 @@
         $form.find('[name=priority]').change(function() {
             var p = S3.cap_priorities,
                 len = p.length;
-            if ($(this).val() == "Unknown")
-                    $(this).css('border', "2px solid gray");
+            if ($(this).val() == "Undefined") {
+                $(this).css('border', "2px solid gray");
+
+                $form.find('[name=urgency]').val("");
+                $form.find('[name=severity]').val("");
+                $form.find('[name=certainty]').val("");
+
+            }
             for (var i=0; i< len; i++) {
                 if (p[i][0] == $(this).val()) {
                     $form.find('[name=urgency]').val(p[i][1]);
@@ -102,7 +108,7 @@
                 }
             }
 
-            $form.find('[name=priority]').val("Unknown")
+            $form.find('[name=priority]').val("Undefined")
                         .css('border', "2px solid gray");
         });
 
