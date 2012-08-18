@@ -291,10 +291,10 @@ class S3CAPModel(S3Model):
                                    #       this should eventually use the CAP contacts
                                    #widget = S3CAPAddressesWidget,
                                    represent=self.list_string_represent),
-                             Field("codes", "text",
+                             Field("codes",
                                    widget = S3KeyValueWidget(),
                                    represent = S3KeyValueWidget.represent,
-                                   default = [{"key": "A", "value": 65, "comment": "ASCII Values", "options": [[65, "sixty-five"], [97, "ninety-five"], ["one-o-3", 103]], "immutable": 1}]
+                                   default = settings.get_cap_codes()
                                    ),
                              Field("note", "text"),
                              Field("reference", "list:reference cap_alert",
@@ -467,6 +467,13 @@ class S3CAPModel(S3Model):
             "Unknown":T("Certainty unknown"),
         }
 
+        # CAP info priority
+        priorities = settings.get_cap_priorities()
+        try:
+            cap_info_priority_opts = [(priorities[f][0], priorities[f][1][0]) for f in priorities]
+        except IndexError:
+            raise ValueError("cap priorities setting is not structured properly")
+
         # @ToDo: i18n: Need label=T("")
         tablename = "cap_info"
         table = define_table(tablename,
@@ -499,16 +506,18 @@ class S3CAPModel(S3Model):
                                    requires=IS_IN_SET(cap_info_responseType_opts,
                                                       multiple=True),
                                    represent=self.list_string_represent), # 0 or more allowed
-                             Field("urgency", notnull=True,
+                             Field("priority"),
+                             Field("urgency", required=True,
                                    requires=IS_IN_SET(cap_info_urgency_opts)),
-                             Field("severity", notnull=True,
+                             Field("severity", required=True,
                                    requires=IS_IN_SET(cap_info_severity_opts)),
-                             Field("certainty", notnull=True,
+                             Field("certainty", required=True,
                                    requires=IS_IN_SET(cap_info_certainty_opts)),
                              Field("audience", "text"),
-                             Field("event_code", "text",
+                             Field("event_code",
                                    widget = S3KeyValueWidget(),
-                                   represent = S3KeyValueWidget.represent
+                                   represent = S3KeyValueWidget.represent,
+                                   default = settings.get_cap_event_codes()
                                    ),
                              Field("effective", "datetime",
                                    # @ToDo: format/represent for l10n options
@@ -524,10 +533,12 @@ class S3CAPModel(S3Model):
                              Field("contact", "text"),
                              Field("web",
                                    requires=IS_NULL_OR(IS_URL())),
-                             Field("parameter", "text",
+                             Field("parameter",
                                    label = T("Parameters"),
                                    widget = S3KeyValueWidget(),
-                                   represent = S3KeyValueWidget.represent),
+                                   represent = S3KeyValueWidget.represent,
+                                   default = settings.get_cap_parameters()
+                                   ),
                              *s3_meta_fields())
 
         info_labels = cap_info_labels()
@@ -1189,7 +1200,10 @@ def cap_alert_controller():
     if "form" in output:
         form = output["form"]
 
-        tablename = form.table._tablename
+        if "table" in form:
+            tablename = form.table._tablename
+        else:
+            return output
 
         T = current.T
 

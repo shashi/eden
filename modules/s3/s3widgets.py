@@ -3734,11 +3734,16 @@ class S3KeyValueWidget(ListWidget):
         if isinstance(value, str):
             try:
                 value = json.loads(value)
+                if isinstance(value, str):
+                    raise ValueError("key-value JSON is wrong.")
             except:
-                # FIXME: Log this.
+                # XXX: log this!
+                #raise ValueError("Bad json was found as value for a key-value field: %s" % value)
                 return ""
+
         rep = []
-        for kv in value:
-            rep += ["%s: %s" % (kv["key"], kv["value"])]
+        if isinstance(value, (tuple, list)):
+            for kv in value:
+                rep += ["%s: %s" % (kv["key"], kv["value"])]
         return ", ".join(rep)
 # END =========================================================================

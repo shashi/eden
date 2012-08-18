@@ -622,10 +622,59 @@ class S3Config(Storage):
     # -------------------------------------------------------------------------
     # Alert
     def get_cap_identifier_prefix(self):
+        """
+            prefix to be prepended to identifiers of cap alerts.
+        """
         return self.cap.get("identifier_prefix", "")
 
     def get_cap_identifier_suffix(self):
+        """
+            suffix to be appended to identifiers of cap alerts.
+        """
         return self.cap.get("identifier_suffix", "")
+
+    def get_cap_codes(self):
+        """
+            default codes for cap alert.
+
+            should return a list of dicts:
+            [ {"key": "<ValueName>, "value": "<Value>",
+               "comment": "<Help string>", "mutable": True|False},
+              ...]
+
+        """
+        return self.cap.get("codes", {})
+
+    def get_cap_event_codes(self):
+        """
+            default alert codes for cap info.
+
+            should return a list of dicts:
+            [ {"key": "<ValueName>, "value": "<Value>",
+               "comment": "<Help string>", "mutable": True|False},
+              ...]
+
+        """
+        return self.cap.get("event_codes", {})
+
+    def get_cap_parameters(self):
+        """
+            default parameters for cap info.
+
+            should return a list of dicts:
+            [ {"key": "<ValueName>, "value": "<Value>",
+               "comment": "<Help string>", "mutable": True|False},
+              ...]
+
+        """
+        return self.cap.get("parameters", {})
+
+    def get_cap_base64(self):
+        """
+            Should cap resources be base64 encoded and embedded in the alert message?
+
+        """
+        return self.cap.get("base64", False)
 
     def get_cap_languages(self):
         """
@@ -645,6 +694,21 @@ class S3Config(Storage):
                                 ("ru", "русский"),
                                 ("es", "Español")
                             ]))
+
+    def get_cap_priorities(self):
+        """
+            settings for priorities.
+
+            Should be an ordered dict of the format
+            OrderedDict([
+                            ("<value>, ("<Descriptive title>", (<urgency>, <severity>, <certainty>))),
+                             ...
+                        ])
+        """
+        T = current.T
+        return self.cap.get("priorities", OrderedDict([
+                                            ("Urgent", (T("Urgent -- very."), ("urgent", "severe", "certain")))
+                                          ]))
 
     # -------------------------------------------------------------------------
     # Human Resource Management
