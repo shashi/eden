@@ -69,6 +69,7 @@ class S3Config(Storage):
         self.project = Storage()
         self.req = Storage()
         self.supply = Storage()
+        self.hms = Storage()
 
     # -------------------------------------------------------------------------
     # Template
@@ -796,7 +797,7 @@ class S3Config(Storage):
             Whether Human Resources should show Education
         """
         return self.hrm.get("use_education", False)
-    
+
     def get_hrm_organisation_label(self):
         """
             Label for Organisations in Human Resources
@@ -882,7 +883,17 @@ class S3Config(Storage):
     # -------------------------------------------------------------------------
     # Organisation
     def get_org_site_code_len(self):
+        """
+            Length of auto-generated Codes for Facilities (org_site)
+        """
         return self.org.get("site_code_len", 10)
+
+    def get_org_summary(self):
+        """
+            Whether to use Summary fields for Organisation/Office:
+                # National/International staff
+        """
+        return self.org.get("summary", False)
 
     # -------------------------------------------------------------------------
     # Proc
@@ -1014,6 +1025,14 @@ class S3Config(Storage):
     # Supply
     def get_supply_catalog_default(self):
         return self.inv.get("catalog_default", "Other Items")
+
+    # -------------------------------------------------------------------------
+    # Hospital Registry
+    def get_hms_track_ctc(self):
+        return self.hms.get("track_ctc", False)
+
+    def get_hms_activity_reports(self):
+        return self.hms.get("activity_reports", False)
 
     # -------------------------------------------------------------------------
     # Active modules list

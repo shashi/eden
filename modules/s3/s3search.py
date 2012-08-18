@@ -47,7 +47,7 @@ from s3crud import S3CRUD
 from s3navigation import s3_search_tabs
 from s3utils import s3_debug, S3DateTime, s3_get_foreign_key
 from s3validators import *
-from s3widgets import CheckboxesWidgetS3, S3OrganisationHierarchyWidget, s3_grouped_checkboxes_widget
+from s3widgets import S3OrganisationHierarchyWidget, s3_grouped_checkboxes_widget
 
 from s3resource import S3FieldSelector
 
@@ -2078,17 +2078,29 @@ class S3LocationSearch(S3Search):
             fieldname = str.lower(_vars.field)
             field = table[fieldname]
 
-            # Default fields to return
-            fields = [table.id,
-                      table.name,
-                      table.level,
-                      table.parent,
-                      table.path,
-                      table.uuid,
-                      table.lat,
-                      table.lon,
-                      table.addr_street,
-                      table.addr_postcode]
+            if _vars.simple:
+                fields = [table.id,
+                          table.name,
+                          table.level,
+                          table.path,
+                          table.L0,
+                          table.L1,
+                          table.L2,
+                          table.L3
+                          ]
+            else:
+                # Default fields to return
+                fields = [table.id,
+                          table.name,
+                          table.level,
+                          table.parent,
+                          table.path,
+                          table.uuid,
+                          table.lat,
+                          table.lon,
+                          table.addr_street,
+                          table.addr_postcode
+                          ]
 
             # Optional fields
             if "level" in _vars and _vars.level:
@@ -2202,7 +2214,8 @@ class S3LocationSearch(S3Search):
                           table.lat,
                           table.lon,
                           table.addr_street,
-                          table.addr_postcode]
+                          table.addr_postcode
+                          ]
             else:
                 output = current.xml.json_message(
                                 False,
@@ -2491,7 +2504,7 @@ class S3HRSearch(S3Search):
                       "person_id$first_name",
                       "person_id$middle_name",
                       "person_id$last_name",
-                      "job_role_id$name",
+                      "job_title_id$name",
                       ]
             show_orgs = current.deployment_settings.get_hrm_show_organisation()
             if show_orgs:
@@ -2510,7 +2523,7 @@ class S3HRSearch(S3Search):
                             "middle" : row["pr_person"].middle_name or "",
                             "last"   : row["pr_person"].last_name or "",
                             "org"    : row["org_organisation"].name if show_orgs else "",
-                            "job"    : row["hrm_job_role"].name or "",
+                            "job"    : row["hrm_job_title"].name or "",
                         } for row in rows ]
             else:
                 items = []

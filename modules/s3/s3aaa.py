@@ -201,6 +201,7 @@ class AuthS3(Auth):
         else:
             shelter = T("Shelter")
         self.org_site_types = Storage(
+                                      transport_airport = T("Airport"),
                                       cr_shelter = shelter,
                                       org_facility = T("Facility"),
                                       #org_facility = T("Site"),
@@ -208,6 +209,8 @@ class AuthS3(Auth):
                                       hms_hospital = T("Hospital"),
                                       #fire_station = T("Fire Station"),
                                       dvi_morgue = T("Morgue"),
+                                      transport_seaport = T("Seaport"),
+                                      inv_warehouse = T("Warehouse"),
                                       )
 
     # -------------------------------------------------------------------------
@@ -3758,7 +3761,8 @@ class S3Permission(object):
 
         db = current.db
 
-        if "approved_by" not in table.fields:
+        approve = current.s3db.get_config(table, "requires_approval", False)
+        if not approve or "approved_by" not in table.fields:
             return True
 
         if isinstance(record, (Row, dict)):
@@ -4016,7 +4020,8 @@ class S3Permission(object):
             _debug("*** ALL RECORDS ***")
             return ALL_RECORDS
 
-        approve = current.deployment_settings.get_auth_record_approval()
+        approve = current.deployment_settings.get_auth_record_approval() & \
+                  current.s3db.get_config(table, "requires_approval", False)
         if approve and "approved_by" in table.fields:
             approver_role = current.session["approver_role"]
             if approver_role is None:
