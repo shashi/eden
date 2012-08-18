@@ -3715,6 +3715,8 @@ class S3KeyValueWidget(ListWidget):
         _class = "text hide"
 
         attributes["_id"] = _id
+        attributes["_name"] = _name
+        attributes["_class"] = _class
 
         script = SCRIPT(
 '''jQuery(document).ready(function(){jQuery('#%s').kv_pairs('%s','%s')})''' % \

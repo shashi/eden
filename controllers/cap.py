@@ -47,7 +47,7 @@ def info_prep(r):
             try:
                 template_info_id = s3db.cap_info(s3db.cap_info.id == request.resource._ids[0]) \
                                     .template_info_id
-            except KeyError:
+            except AttributeError, KeyError:
                 pass
         elif (r.component and r.component.tablename == "cap_info"):
             try:
@@ -113,7 +113,7 @@ def alert():
     """ REST controller for CAP alerts """
 
     def prep(r):
-        if len(r.resource._ids) == 1 and \
+        if "_ids" in dir(r.resource) and len(r.resource._ids) == 1 and \
             s3db.cap_alert_is_template(r.resource._ids[0]):
             redirect(URL(c="cap", f="template", args=request.args, vars=request.vars))
 

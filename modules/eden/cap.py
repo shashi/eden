@@ -913,7 +913,11 @@ class S3CAPModel(S3Model):
         """
             Generate a sender for a new form
         """
-        user_id = current.auth.user.id
+        try:
+            user_id = current.auth.user.id
+        except AttributeError:
+            return ""
+
         return "%s/%d" % (current.manager.domain, user_id)
 
     # -------------------------------------------------------------------------
@@ -969,10 +973,11 @@ class S3CAPModel(S3Model):
         try:
             if isinstance(string, list):
                 return ", ".join([fmt(i) for i in string])
-            else:
+            elif isinstance(string, str):
                 return ", ".join([fmt(i) for i in string[1:-1].split("|")])
         except IndexError:
             return current.messages.UNKNOWN_OPT
+        return ""
 
     # -------------------------------------------------------------------------
     @staticmethod
