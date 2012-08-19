@@ -644,7 +644,7 @@ class S3Config(Storage):
               ...]
 
         """
-        return self.cap.get("codes", {})
+        return self.cap.get("codes", [])
 
     def get_cap_event_codes(self):
         """
@@ -656,7 +656,7 @@ class S3Config(Storage):
               ...]
 
         """
-        return self.cap.get("event_codes", {})
+        return self.cap.get("event_codes", [])
 
     def get_cap_parameters(self):
         """
@@ -668,7 +668,7 @@ class S3Config(Storage):
               ...]
 
         """
-        return self.cap.get("parameters", {})
+        return self.cap.get("parameters", [])
 
     def get_cap_geocodes(self):
         """
@@ -680,7 +680,7 @@ class S3Config(Storage):
               ...]
 
         """
-        return self.cap.get("geocodes", {})
+        return self.cap.get("geocodes", [])
 
     def get_cap_base64(self):
         """

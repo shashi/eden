@@ -206,7 +206,7 @@
                 </addresses>
             </xsl:if>
 
-            <xsl:if test="data[@field='code']">
+            <xsl:if test="data[@field='codes']">
                 <xsl:call-template name="key-value-pairs">
                     <xsl:with-param name="string"><xsl:value-of select="data[@field='codes']"/>
                     </xsl:with-param>
