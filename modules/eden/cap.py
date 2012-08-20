@@ -1,3 +1,4 @@
+import pdb
 # -*- coding: utf-8 -*-
 
 """ Sahana Eden Messaging Model
@@ -363,9 +364,6 @@ class S3CAPModel(S3Model):
                                    comment = T("The alert message containing this information"),
                                    ondelete = "RESTRICT")
 
-        # CAP Informations as component of Alerts
-        add_component("cap_info", cap_alert="alert_id")
-
         table.identifier.comment = DIV(
               _class="tooltip",
               _title="%s|%s" % (
@@ -570,6 +568,9 @@ class S3CAPModel(S3Model):
                                    ),
                              *s3_meta_fields())
 
+        # CAP Informations as component of Alerts
+        add_component("cap_info", cap_alert="alert_id")
+
         info_labels = cap_info_labels()
         for field in info_labels:
             db.cap_info[field].label = info_labels[field]
@@ -604,6 +605,8 @@ class S3CAPModel(S3Model):
                                   label = T("Alert Information"),
                                   comment = T("The alert information"),
                                   ondelete = "RESTRICT")
+
+        self.configure(tablename, onaccept=info_onaccept)
 
         # @ToDo: Move these to the controller in a prep if r.interactive
         table.language.comment = DIV(
@@ -758,6 +761,7 @@ class S3CAPModel(S3Model):
         tablename = "cap_info_resource"
         table = define_table(tablename,
                              info_id(),
+                             alert_id(),
                              Field("resource_desc", required=True),
                              Field("mime_type", required=True),
                              Field("size", "integer",
@@ -773,8 +777,15 @@ class S3CAPModel(S3Model):
 
         # @ToDo: CRUD Strings
 
-        # Resource as component of Information
-        add_component("cap_info_resource", cap_info="info_id")
+        # Resource as component of <alert> and <info>
+        add_component(tablename, cap_alert="alert_id")
+        add_component(tablename, cap_info="info_id")
+
+        self.configure(tablename,
+                       onaccept=update_alert_id(table)
+                      )
+
+        table.alert_id.writable = False
 
         # @ToDo: Move these to the controller in a prep if r.interactive
         table.resource_desc.comment = DIV(
@@ -817,6 +828,7 @@ class S3CAPModel(S3Model):
         tablename = "cap_info_area"
         table = self.define_table(tablename,
                                   info_id(),
+                                  alert_id(),
                                   Field("area_desc",
                                         label = T("Area description"),
                                         required=True),
@@ -832,8 +844,15 @@ class S3CAPModel(S3Model):
 
         # @ToDo: CRUD Strings
 
-        # Area as component of Information
+        # Area as component of the Alert and Information
+        add_component("cap_info_area", cap_alert="alert_id")
         add_component("cap_info_area", cap_info="info_id")
+
+        self.configure(tablename,
+                       onaccept=update_alert_id(table)
+                      )
+
+        table.alert_id.writable = False
 
         # @ToDo: Move these to the controller in a prep if r.interactive
         table.area_desc.comment = DIV(
@@ -1345,4 +1364,64 @@ def set_priority_js():
     if not priority_conf in js_global:
         js_global.append(priority_conf)
 
+def update_alert_id(table):
+    """ On-accept for area and resource records """
+
+    def func(form):
+        if "vars" in form:
+            vars = form.vars
+        elif "id" in form:
+            vars = form
+        elif hasattr(form, "vars"):
+            vars = form.vars
+        else:
+            vars = form
+
+        # Get the full record
+        id = vars.id
+        if not id:
+            return
+
+        db = current.db
+
+        item = db(table.id == id).select(table.info_id, limitby=(0, 1)).first()
+        info_id = item.info_id
+
+        itable = db.cap_info
+        info = db(itable.id == info_id).select(itable.alert_id, limitby=(0, 1)).first()
+        alert_id = info.alert_id
+
+        pdb.set_trace() ############################## Breakpoint ##############################
+        db(table.id == id).update(alert_id = alert_id)
+        db.commit()
+
+    return func
+
+def info_onaccept(form):
+
+    if "vars" in form:
+        vars = form.vars
+    elif "id" in form:
+        vars = form
+    elif hasattr(form, "vars"):
+        vars = form.vars
+    else:
+        vars = form
+
+    self_id = vars.id
+    if not id:
+        return
+
+    db = current.db
+
+    atable, itable = db.cap_alert, db.cap_info
+
+    info = db(itable).select(itable.id == id, limitby=(0, 1)).first()
+    alert_id = info.alert_id
+
+    if alert_id and s3db.cap_alert_is_template(alert_id) and info:
+        info.is_template = True
+        info.update()
+
+    return True
 # END =========================================================================

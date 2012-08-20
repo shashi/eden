@@ -68,47 +68,6 @@ def info_prep(r):
     return True
 
 # -----------------------------------------------------------------------------
-def info_postp(r, output):
-    if r.tablename == "cap_info" or \
-       r.component and r.component.tablename == "cap_info":
-
-        alert_id = None
-        self_id = None
-        if r.tablename == "cap_info":
-            alert_id = r.resource.select()[0].alert_id
-            self_id  = r.resource.get_id()
-        elif r.tablename == "cap_alert":
-            alert_id = r.resource.get_id()
-            self_id  = r.component.lastid
-
-        if alert_id:
-            if s3db.cap_alert_is_template(alert_id):
-                info = s3db.cap_info(s3db.cap_info.id == self_id)
-                if info:
-                    info.is_template = True
-                    info.update()
-        #if request.post_vars.get("add_language", False):
-        #    alert_id = None
-        #    if r.tablename == "cap_info":
-        #        alert_id = r.resource.alert_id
-        #    elif r.tablename == "cap_alert":
-        #        alert_id = r.resource.get_id()
-
-        #    if alert_id:
-        #        r.next = URL(c="cap", f="alert",
-        #                     args=[alert_id, "info/create"])
-
-        #if request.post_vars.get("add_file", False):
-        #    r.next = URL(c="cap", f="info",
-        #                 args=[r.component.lastid, "info_resource"])
-
-        #if request.post_vars.get("add_area", False):
-        #    r.next = URL(c="cap", f="info",
-        #                 args=[r.component.lastid, "info_area"])
-        pass
-    return output
-
-# -----------------------------------------------------------------------------
 def alert():
     """ REST controller for CAP alerts """
 
@@ -185,7 +144,7 @@ def alert():
 
                 r.next = URL(c="cap", f="alert",
                              args=[r.resource.lastid, "info"])
-        return info_postp(r, output)
+        return output
 
     s3.postp = postp
 
@@ -199,7 +158,6 @@ def info():
 
 
     s3.prep = info_prep
-    s3.postp = info_postp
 
     s3.scripts.append("/%s/static/scripts/S3/s3.cap.js" % appname)
     s3.stylesheets.append("S3/cap.css")
@@ -213,7 +171,6 @@ def template():
     #redirect(URL(c="cap", f="alert", args=request.args, vars=vars))
     #return True
     #s3.prep = info_prep
-    s3.postp = info_postp
 
     viewing = request.vars['viewing']
     if viewing:
